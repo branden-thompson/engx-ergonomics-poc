@@ -74,7 +74,7 @@ func (ip *InlinePrompter) RunPrompts(devOnly bool, flags []string) (*config.User
 func (ip *InlinePrompter) askPrompt(prompt *config.PromptConfig) error {
 	for {
 		// Show the question with Claude Code-style formatting
-		fmt.Printf("⏺ %s ", prompt.Question)
+		fmt.Printf("? %s ", prompt.Question)
 
 		// Read user input
 		input, err := ip.reader.ReadString('\n')
