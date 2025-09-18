@@ -52,6 +52,19 @@ func LoadPromptConfiguration() (*PromptConfiguration, error) {
 				ResponseFormat: "Will configure application for %s deployment",
 				ConfigKey:     "DeploymentTarget",
 			},
+			{
+				ID:      "federated_nav",
+				Trigger: "always", // Always ask this question regardless of other options
+				Question: "Will this app use the Federated Global Nav & Chrome? (y/n)",
+				UserOptions: map[string]string{
+					"y":   "true",
+					"yes": "true",
+					"n":   "false",
+					"no":  "false",
+				},
+				ResponseFormat: "%s Nav & Chrome templates...",
+				ConfigKey:     "FederatedNavigation",
+			},
 		},
 	}
 
@@ -116,6 +129,12 @@ func (p *PromptConfig) GetResponseMessage(userInput string) string {
 		} else {
 			displayValue = "Azure Container"
 		}
+	case "federated_nav":
+		if configValue == "true" {
+			displayValue = "Including Federated Global"
+		} else {
+			displayValue = "Including standalone App Header &"
+		}
 	default:
 		displayValue = configValue
 	}
@@ -158,6 +177,17 @@ func (p *PromptConfig) GetResponseLines(userInput string) []string {
 				"Configuring for Azure Container deployment",
 				"Setting Application to use Azure DevOps pipelines (can be changed later...)",
 				"Setting fabric to CLOUD (can be changed later...)",
+			}
+		}
+	case "federated_nav":
+		if configValue == "true" {
+			return []string{
+				"Including Federated Global Nav & Global Chrome templates...",
+				"Registering " + "AppName" + " into Global Navigation Registry...",
+			}
+		} else {
+			return []string{
+				"Including standalone App Header & Chrome templates...",
 			}
 		}
 	default:

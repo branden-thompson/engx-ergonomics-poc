@@ -87,6 +87,16 @@ func NewTestingFeatureSelector() *FeatureSelector {
 	return newFeatureSelector("Testing Setup", choices, 0)
 }
 
+// NewNavigationSelector creates a navigation configuration selector
+func NewNavigationSelector() *FeatureSelector {
+	choices := []FeatureChoice{
+		{name: "Federated Global Nav & Chrome", description: "Use shared navigation with global chrome templates", selected: false},
+		{name: "Standalone App Header & Chrome", description: "Use standalone app header and chrome templates", selected: true, recommended: true},
+	}
+
+	return newFeatureSelector("Navigation Configuration", choices, 1) // Require exactly one selection
+}
+
 // newFeatureSelector creates a new feature selector with the given configuration
 func newFeatureSelector(category string, choices []FeatureChoice, minSelected int) *FeatureSelector {
 	// Convert to list items
@@ -184,6 +194,8 @@ func (fs *FeatureSelector) View() string {
 		icon = "🚀"
 	} else if fs.category == "Testing Setup" {
 		icon = "🧪"
+	} else if fs.category == "Navigation Configuration" {
+		icon = "🧭"
 	}
 
 	view.WriteString(headerStyle.Render(icon + " " + fs.list.Title))
@@ -266,6 +278,10 @@ func (fs *FeatureSelector) GetValue() interface{} {
 			E2ETesting:  fs.isSelected("E2E Testing"),
 			Coverage:    fs.isSelected("Coverage Reports"),
 		}
+	case "Navigation Configuration":
+		return config.NavigationConfig{
+			UseFederatedNav: fs.isSelected("Federated Global Nav & Chrome"),
+		}
 	}
 	return nil
 }
@@ -288,6 +304,9 @@ func (fs *FeatureSelector) SetValue(value interface{}) {
 		fs.setSelected("Unit Testing", v.UnitTesting)
 		fs.setSelected("E2E Testing", v.E2ETesting)
 		fs.setSelected("Coverage Reports", v.Coverage)
+	case config.NavigationConfig:
+		fs.setSelected("Federated Global Nav & Chrome", v.UseFederatedNav)
+		fs.setSelected("Standalone App Header & Chrome", !v.UseFederatedNav)
 	}
 }
 

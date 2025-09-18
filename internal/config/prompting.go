@@ -51,6 +51,7 @@ type UserConfiguration struct {
 	DevFeatures DevFeatureConfig `json:"devFeatures"`
 	ProductionSetup ProductionConfig `json:"productionSetup"`
 	Testing     TestingConfig  `json:"testing"`
+	Navigation  NavigationConfig `json:"navigation"`
 }
 
 // TemplateConfig contains template-specific configuration
@@ -87,6 +88,11 @@ type TestingConfig struct {
 	UnitTesting bool `json:"unitTesting"`
 	E2ETesting  bool `json:"e2eTesting"`
 	Coverage    bool `json:"coverage"`
+}
+
+// NavigationConfig contains navigation and chrome configuration
+type NavigationConfig struct {
+	UseFederatedNav bool `json:"useFederatedNav"`
 }
 
 // GetSelectedDevFeatures returns a list of selected development features
@@ -146,6 +152,17 @@ func (t TestingConfig) GetSelected() []string {
 	return selected
 }
 
+// GetSelectedNavigationFeatures returns a list of selected navigation features
+func (n NavigationConfig) GetSelected() []string {
+	var selected []string
+	if n.UseFederatedNav {
+		selected = append(selected, "Federated Global Nav & Chrome")
+	} else {
+		selected = append(selected, "Standalone App Header & Chrome")
+	}
+	return selected
+}
+
 // GetSummary returns a formatted summary of the configuration
 func (c UserConfiguration) GetSummary() string {
 	var summary strings.Builder
@@ -180,6 +197,15 @@ func (c UserConfiguration) GetSummary() string {
 		summary.WriteString("\n")
 	}
 
+	navFeatures := c.Navigation.GetSelected()
+	if len(navFeatures) > 0 {
+		summary.WriteString("Navigation:\n")
+		for _, feature := range navFeatures {
+			summary.WriteString(fmt.Sprintf("• %s\n", feature))
+		}
+		summary.WriteString("\n")
+	}
+
 	return summary.String()
 }
 
@@ -204,6 +230,9 @@ func GetSmartDefaults(projectName string) UserConfiguration {
 		Testing: TestingConfig{
 			UnitTesting: true, // Basic testing is good practice
 			// Leave advanced testing unselected
+		},
+		Navigation: NavigationConfig{
+			UseFederatedNav: false, // Default to standalone navigation
 		},
 	}
 }

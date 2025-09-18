@@ -26,6 +26,7 @@ const (
 	PromptTypeDevFeatures
 	PromptTypeProductionSetup
 	PromptTypeTesting
+	PromptTypeNavigation
 	PromptTypeConfirmation
 )
 

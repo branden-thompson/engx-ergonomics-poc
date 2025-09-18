@@ -55,6 +55,14 @@ func NewPromptOrchestrator(projectName string) PromptOrchestrator {
 			HelpText:  "Set up testing frameworks and tools",
 			Type:      prompts.PromptTypeTesting,
 		},
+		{
+			ID:        "navigation",
+			Title:     "Navigation Configuration",
+			Component: prompts.NewNavigationSelector(),
+			Required:  true,
+			HelpText:  "Choose between federated global navigation or standalone app navigation",
+			Type:      prompts.PromptTypeNavigation,
+		},
 	}
 
 	return PromptOrchestrator{
@@ -251,6 +259,11 @@ func (po *PromptOrchestrator) savePromptValue(promptStep *prompts.PromptStep) {
 	case prompts.PromptTypeTesting:
 		if testing, ok := value.(config.TestingConfig); ok {
 			po.config.Testing = testing
+		}
+
+	case prompts.PromptTypeNavigation:
+		if navigation, ok := value.(config.NavigationConfig); ok {
+			po.config.Navigation = navigation
 		}
 	}
 }
