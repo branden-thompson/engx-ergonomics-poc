@@ -165,7 +165,7 @@ func (r *EnhancedRenderer) Render(width int) string {
 	// Store the width for consistent formatting
 	r.totalWidth = width
 
-	// Header section
+	// Header section (includes empty line between header and progress)
 	output.WriteString(r.renderHeader())
 	output.WriteString("\n")
 
@@ -178,6 +178,9 @@ func (r *EnhancedRenderer) Render(width int) string {
 			output.WriteString("\n")
 		}
 	}
+
+	// Empty line before separator
+	output.WriteString("\n")
 
 	// Top separator
 	output.WriteString(strings.Repeat("-", r.totalWidth))
@@ -202,6 +205,9 @@ func (r *EnhancedRenderer) Render(width int) string {
 	output.WriteString(strings.Repeat("-", r.totalWidth))
 	output.WriteString("\n")
 
+	// Empty line for breathing space (as shown in template)
+	output.WriteString("\n")
+
 	// Application Components section
 	output.WriteString(r.renderApplicationComponents())
 
@@ -213,18 +219,40 @@ func (r *EnhancedRenderer) Render(width int) string {
 
 // renderHeader creates the header with app name and total progress
 func (r *EnhancedRenderer) renderHeader() string {
+	// Determine setup type based on devOnly flag
+	setupType := "PRODUCTION READY SETUP"
+	if r.isDevOnly {
+		setupType = "DEV SETUP"
+	}
+
+	// Create header with setup type
 	headerText := fmt.Sprintf("--- Creating %s ", r.appName)
-	padding := r.totalWidth - len(headerText)
-	if padding > 0 {
-		headerText += strings.Repeat("-", padding)
+	setupPadding := fmt.Sprintf(" %s ", setupType)
+	totalHeaderLength := len(headerText) + len(setupPadding) + 4 // 4 dashes at end
+
+	if totalHeaderLength < r.totalWidth {
+		middlePadding := r.totalWidth - len(headerText) - len(setupPadding) - 4
+		headerText += strings.Repeat("-", middlePadding) + setupPadding + "----"
+	} else {
+		headerText += setupPadding + "----"
 	}
 
 	// Total progress line
 	overallProgress := r.GetOverallProgress()
-	totalProgressBar := r.renderProgressBar(overallProgress, 55) // Wider bar for total progress
-	progressText := fmt.Sprintf("Total Progress: %s %5.1f%%", totalProgressBar, overallProgress*100)
+	totalProgressBar := r.renderProgressBar(overallProgress, 47) // Adjusted for new format
 
-	return fmt.Sprintf("%s\n%s", headerText, progressText)
+	// Format progress percentage consistently
+	var overallProgressPercent string
+	totalProgress := overallProgress * 100
+	if totalProgress == 0.0 {
+		overallProgressPercent = "0.0%"
+	} else {
+		overallProgressPercent = fmt.Sprintf("%.1f%%", totalProgress)
+	}
+
+	progressText := fmt.Sprintf("Total Progress: %s %6s", totalProgressBar, overallProgressPercent)
+
+	return fmt.Sprintf("%s\n\n%s", headerText, progressText)
 }
 
 // renderCurrentStepInfo shows the current running step with spinner or completion
@@ -277,8 +305,18 @@ func (r *EnhancedRenderer) renderStepLine(index int, step Step) string {
 		icon = "[✗]"
 	}
 
-	// Progress percentage
-	progressPercent := fmt.Sprintf("%5.1f%%", step.Progress*100)
+	// Progress percentage - ensure 0.0% instead of 0.
+	var progressPercent string
+	progress := step.Progress * 100
+
+	// Force explicit formatting to prevent any edge cases
+	if progress <= 0.0 {
+		progressPercent = " 0.0%"  // Explicit format
+	} else if progress >= 100.0 {
+		progressPercent = "100.0%"  // Explicit format
+	} else {
+		progressPercent = fmt.Sprintf("%5.1f%%", progress)
+	}
 
 	// Calculate dynamic progress bar width
 	// Total width - icon - spaces - percentage = remaining for step name and progress bar
@@ -352,35 +390,30 @@ func (r *EnhancedRenderer) renderFooterInfo() string {
 func (r *EnhancedRenderer) renderApplicationComponents() string {
 	var output strings.Builder
 
-	// Section header
-	setupType := "DEV SETUP"
-	if !r.isDevOnly {
-		setupType = "PRODUCTION DEPLOYABLE"
-	}
-
-	headerText := fmt.Sprintf("---- Application Components ------------------- { %s } ", setupType)
-	padding := r.totalWidth - len(headerText) - 4 // Account for " ----"
+	// Section header - simple format to match template
+	headerText := "---- APPLICATION COMPONENTS "
+	padding := r.totalWidth - len(headerText)
 	if padding > 0 {
-		headerText += strings.Repeat("-", padding) + " ----"
+		headerText += strings.Repeat("-", padding)
 	}
 	output.WriteString(headerText + "\n")
 
 	// Core Technologies section
-	output.WriteString("CORE TECHNOLOGIES:\n")
+	output.WriteString("• Core Technologies:\n")
 	for _, component := range r.coreTechnologies {
 		output.WriteString(r.renderComponentLine(component))
 	}
 	output.WriteString("\n")
 
 	// EngX Integrations section
-	output.WriteString("ENGX INTEGRATIONS:\n")
+	output.WriteString("• EngX Integrations:\n")
 	for _, component := range r.engxIntegrations {
 		output.WriteString(r.renderComponentLine(component))
 	}
 	output.WriteString("\n")
 
 	// Quality & Testing section
-	output.WriteString("QUALITY & TESTING:\n")
+	output.WriteString("• Quality & Testing:\n")
 	for _, component := range r.qualityComponents {
 		// Convert QualityComponent to Component for consistent rendering
 		var icon string

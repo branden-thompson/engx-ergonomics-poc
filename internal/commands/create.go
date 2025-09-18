@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/models"
+	"github.com/bthompso/engx-ergonomics-poc/internal/prompts"
 	"github.com/spf13/cobra"
 )
 
@@ -34,12 +36,12 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			appName := args[0]
 
-			// Collect flags
+			// Collect only explicitly set flags
 			var flags []string
-			if devOnly {
+			if cmd.Flags().Changed("dev-only") && devOnly {
 				flags = append(flags, "--dev-only")
 			}
-			if template != "" {
+			if cmd.Flags().Changed("template") && template != "" {
 				flags = append(flags, fmt.Sprintf("--template=%s", template))
 			}
 
@@ -53,9 +55,29 @@ Examples:
 				flags = append(flags, "--quiet")
 			}
 
-			// Initialize and run TUI
-			model := models.NewAppModel("create", appName, flags)
-			program := tea.NewProgram(model, tea.WithAltScreen())
+			// Run inline prompts first (traditional CLI style)
+			prompter, err := prompts.NewInlinePrompter()
+			if err != nil {
+				return fmt.Errorf("failed to initialize prompter: %w", err)
+			}
+
+			userConfig, err := prompter.RunPrompts(devOnly, flags)
+			if err != nil {
+				return fmt.Errorf("failed to run prompts: %w", err)
+			}
+
+			// Set the project name in config
+			userConfig.ProjectName = appName
+
+			// Initialize and run TUI with configuration already set (inline mode)
+			model := models.NewAppModelWithConfig("create", appName, flags, userConfig)
+
+			// Configure for inline mode with proper input/output handling
+			program := tea.NewProgram(
+				model,
+				tea.WithInput(os.Stdin),
+				tea.WithOutput(os.Stderr),
+			)
 
 			if _, err := program.Run(); err != nil {
 				return fmt.Errorf("failed to run application: %w", err)
@@ -67,7 +89,7 @@ Examples:
 
 	// Add command-specific flags
 	cmd.Flags().BoolVar(&devOnly, "dev-only", false, "Create app for development only (skip production setup)")
-	cmd.Flags().StringVar(&template, "template", "typescript", "Template to use (typescript, javascript, minimal)")
+	cmd.Flags().StringVar(&template, "template", "", "Template to use (typescript, javascript, minimal)")
 
 	return cmd
 }

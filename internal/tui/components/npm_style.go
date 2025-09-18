@@ -185,6 +185,10 @@ func (r *NPMStyleRenderer) renderStep(index int, step Step, isCurrent bool) stri
 	if (step.Status == StepRunning || step.Status == StepComplete) && step.Progress > 0 {
 		stepProgressBar := r.renderProgressBar(step.Progress, 20)
 		stepText = fmt.Sprintf("%s %s %s %.1f%%", icon, step.Name, stepProgressBar, step.Progress*100)
+	} else if step.Status == StepRunning {
+		// Show 0.0% for running steps that haven't started yet
+		stepProgressBar := r.renderProgressBar(0.0, 20)
+		stepText = fmt.Sprintf("%s %s %s 0.0%%", icon, step.Name, stepProgressBar)
 	}
 
 	if isCurrent && step.Status == StepRunning && step.Message != "" {
