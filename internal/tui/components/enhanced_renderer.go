@@ -363,40 +363,12 @@ func (r *EnhancedRenderer) renderCurrentStepInfo(step Step) string {
 
 // renderStepLine creates a single aligned step line with dynamic width
 func (r *EnhancedRenderer) renderStepLine(index int, step Step) string {
-	// Status icon with colors
-	var icon string
-	switch step.Status {
-	case StepPending:
-		icon = fmt.Sprintf("%s[ ]%s", colorWhite, colorReset)
-	case StepRunning:
-		icon = fmt.Sprintf("%s[✓ ]%s", colorBlue, colorReset) // Blue for running
-	case StepComplete:
-		icon = fmt.Sprintf("%s[✓]%s", colorGreen, colorReset) // Green for complete
-	case StepError:
-		icon = fmt.Sprintf("%s[✗]%s", colorRed, colorReset) // Red for error
-	}
+	// Use modular status icon system
+	iconType := statusIconTypeFromStepStatus(step.Status)
+	icon := r.renderStatusIcon(iconType)
 
-	// Determine progress state based on step status and progress
-	var progressState ProgressState
-	switch step.Status {
-	case StepPending:
-		progressState = StateQueued
-	case StepRunning:
-		progressState = StateRunning
-	case StepComplete:
-		progressState = StateDone
-	case StepError:
-		progressState = StateFailed
-	default:
-		// Fallback based on progress value
-		if step.Progress >= 1.0 {
-			progressState = StateDone
-		} else if step.Progress > 0 {
-			progressState = StateRunning
-		} else {
-			progressState = StateQueued
-		}
-	}
+	// Use modular progress state system
+	progressState := progressStateFromStepStatus(step.Status, step.Progress)
 
 	// Calculate dynamic progress bar width (account for plain icon text for spacing)
 	plainIcon := "[ ]" // Use plain icon for width calculation
@@ -630,6 +602,8 @@ func (r *EnhancedRenderer) renderColoredPercentage(progress float64, state Progr
 	var percentText string
 	if percentage == 0.0 {
 		percentText = "0.0%"
+	} else if percentage >= 100.0 {
+		percentText = "100.0%"  // Ensure 100% always shows as "100.0%"
 	} else {
 		percentText = fmt.Sprintf("%.1f%%", percentage)
 	}
@@ -658,6 +632,81 @@ func (r *EnhancedRenderer) renderColoredPercentage(progress float64, state Progr
 	}
 
 	return fmt.Sprintf("%s%s%s", percentColor, percentText, colorReset)
+}
+
+// StatusIconType represents different types of status indicators
+type StatusIconType int
+
+const (
+	IconPending StatusIconType = iota
+	IconRunning
+	IconComplete
+	IconError
+	IconQueued  // Alias for pending
+)
+
+// renderStatusIcon creates a colored status icon based on type
+func (r *EnhancedRenderer) renderStatusIcon(iconType StatusIconType) string {
+	var icon, color string
+
+	switch iconType {
+	case IconPending, IconQueued:
+		icon = "[ ]"
+		color = colorWhite
+	case IconRunning:
+		icon = "[✓ ]" // Space after checkmark for running steps
+		color = colorBlue
+	case IconComplete:
+		icon = "[✓]"
+		color = colorGreen
+	case IconError:
+		icon = "[✗]"
+		color = colorRed
+	default:
+		icon = "[ ]"
+		color = colorWhite
+	}
+
+	return fmt.Sprintf("%s%s%s", color, icon, colorReset)
+}
+
+// statusIconTypeFromStepStatus converts step status to icon type
+func statusIconTypeFromStepStatus(status StepStatus) StatusIconType {
+	switch status {
+	case StepPending:
+		return IconPending
+	case StepRunning:
+		return IconRunning
+	case StepComplete:
+		return IconComplete
+	case StepError:
+		return IconError
+	default:
+		return IconPending
+	}
+}
+
+// progressStateFromStepStatus converts step status to progress state
+func progressStateFromStepStatus(status StepStatus, progress float64) ProgressState {
+	switch status {
+	case StepPending:
+		return StateQueued
+	case StepRunning:
+		return StateRunning
+	case StepComplete:
+		return StateDone
+	case StepError:
+		return StateFailed
+	default:
+		// Fallback based on progress value
+		if progress >= 1.0 {
+			return StateDone
+		} else if progress > 0 {
+			return StateRunning
+		} else {
+			return StateQueued
+		}
+	}
 }
 
 // formatDuration formats a duration into HH:MM:SS format
