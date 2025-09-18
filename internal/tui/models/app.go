@@ -12,6 +12,7 @@ import (
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/styles"
 	progresssim "github.com/bthompso/engx-ergonomics-poc/internal/simulation/progress"
+	"github.com/bthompso/engx-ergonomics-poc/internal/chaos"
 )
 
 // AppState represents the current state of the application
@@ -45,6 +46,7 @@ type AppModel struct {
 
 	// Progress tracking
 	tracker    *progresssim.Tracker
+	chaosTracker *chaos.ChaosAwareTracker
 	startTime  time.Time
 
 	// Execution state
@@ -800,4 +802,17 @@ func (m *AppModel) updateComponentsFromConfig() {
 	// Update AAR generator with proper user configuration
 	projectPath := fmt.Sprintf("./%s", m.target)
 	m.aarGenerator = aar.NewAARGenerator(m.tracker, m.userConfig, m.startTime, projectPath)
+}
+
+// NewAppModelWithChaos creates a new app model with chaos injection capabilities
+func NewAppModelWithChaos(command, target string, flags []string, userConfig *config.UserConfiguration, verbosityConfig *config.VerbosityConfig, chaosInjector chaos.ChaosInjector) *AppModel {
+	// Start with the basic model
+	model := NewAppModelWithVerbosity(command, target, flags, userConfig, verbosityConfig)
+
+	// Add chaos functionality if injector provided
+	if chaosInjector != nil {
+		model.chaosTracker = chaos.NewChaosAwareTracker(model.tracker, chaosInjector)
+	}
+
+	return model
 }
