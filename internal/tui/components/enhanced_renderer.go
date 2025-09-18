@@ -6,6 +6,25 @@ import (
 	"time"
 )
 
+// ANSI color codes for styling
+const (
+	// Colors for header elements
+	colorReset       = "\033[0m"
+	colorBrightMagenta = "\033[95m"  // Bright magenta for app name
+	colorBrightOrange  = "\033[38;5;208m"  // Bright orange for PRODUCTION READY
+	colorBlue          = "\033[94m"  // Blue for DEV ONLY
+	colorLightGrey     = "\033[37m"  // Light grey for lines (not too dark, not white)
+
+	// Text styles
+	styleBold = "\033[1m"
+	styleReset = "\033[22m"
+)
+
+// Helper function to create colored separator lines
+func (r *EnhancedRenderer) renderSeparatorLine() string {
+	return fmt.Sprintf("%s%s%s", colorLightGrey, strings.Repeat("-", r.totalWidth), colorReset)
+}
+
 // EnhancedRenderer renders progress in the comprehensive template format
 type EnhancedRenderer struct {
 	steps         []Step
@@ -183,7 +202,7 @@ func (r *EnhancedRenderer) Render(width int) string {
 	output.WriteString("\n")
 
 	// Top separator
-	output.WriteString(strings.Repeat("-", r.totalWidth))
+	output.WriteString(r.renderSeparatorLine())
 	output.WriteString("\n")
 
 	// Main steps section
@@ -194,7 +213,7 @@ func (r *EnhancedRenderer) Render(width int) string {
 	}
 
 	// Middle separator
-	output.WriteString(strings.Repeat("-", r.totalWidth))
+	output.WriteString(r.renderSeparatorLine())
 	output.WriteString("\n")
 
 	// Footer info section
@@ -202,7 +221,7 @@ func (r *EnhancedRenderer) Render(width int) string {
 	output.WriteString("\n")
 
 	// Bottom separator
-	output.WriteString(strings.Repeat("-", r.totalWidth))
+	output.WriteString(r.renderSeparatorLine())
 	output.WriteString("\n")
 
 	// Empty line for breathing space (as shown in template)
@@ -212,29 +231,45 @@ func (r *EnhancedRenderer) Render(width int) string {
 	output.WriteString(r.renderApplicationComponents())
 
 	// Final separator
-	output.WriteString(strings.Repeat("-", r.totalWidth))
+	output.WriteString(r.renderSeparatorLine())
 
 	return output.String()
 }
 
 // renderHeader creates the header with app name and total progress
 func (r *EnhancedRenderer) renderHeader() string {
-	// Determine setup type based on devOnly flag
-	setupType := "PRODUCTION READY SETUP"
+	// Determine setup type and colors based on devOnly flag
+	var setupType, setupColor string
 	if r.isDevOnly {
 		setupType = "DEV SETUP"
+		setupColor = colorBlue
+	} else {
+		setupType = "PRODUCTION READY SETUP"
+		setupColor = colorBrightOrange
 	}
 
-	// Create header with setup type
-	headerText := fmt.Sprintf("--- Creating %s ", r.appName)
-	setupPadding := fmt.Sprintf(" %s ", setupType)
-	totalHeaderLength := len(headerText) + len(setupPadding) + 4 // 4 dashes at end
+	// Create colored header components
+	dashPrefix := fmt.Sprintf("%s---%s", colorLightGrey, colorReset)
+	coloredAppName := fmt.Sprintf("%s'%s'%s", colorBrightMagenta, r.appName, colorReset)
+	creatingText := fmt.Sprintf(" Creating %s ", coloredAppName)
 
-	if totalHeaderLength < r.totalWidth {
-		middlePadding := r.totalWidth - len(headerText) - len(setupPadding) - 4
-		headerText += strings.Repeat("-", middlePadding) + setupPadding + "----"
+	// Calculate padding for setup type (accounting for color codes in length calculation)
+	plainHeader := fmt.Sprintf("--- Creating '%s' ", r.appName)
+	plainSetupPadding := fmt.Sprintf(" %s ", setupType)
+	plainTotalLength := len(plainHeader) + len(plainSetupPadding) + 4 // 4 dashes at end
+
+	var headerText string
+	if plainTotalLength < r.totalWidth {
+		middlePadding := r.totalWidth - len(plainHeader) - len(plainSetupPadding) - 4
+		middleDashes := fmt.Sprintf("%s%s%s", colorLightGrey, strings.Repeat("-", middlePadding), colorReset)
+		coloredSetupType := fmt.Sprintf(" %s%s%s ", setupColor, setupType, colorReset)
+		endDashes := fmt.Sprintf("%s----%s", colorLightGrey, colorReset)
+
+		headerText = dashPrefix + creatingText + middleDashes + coloredSetupType + endDashes
 	} else {
-		headerText += setupPadding + "----"
+		coloredSetupType := fmt.Sprintf(" %s%s%s ", setupColor, setupType, colorReset)
+		endDashes := fmt.Sprintf("%s----%s", colorLightGrey, colorReset)
+		headerText = dashPrefix + creatingText + coloredSetupType + endDashes
 	}
 
 	// Total progress line
@@ -393,10 +428,14 @@ func (r *EnhancedRenderer) renderApplicationComponents() string {
 	// Section header - simple format to match template
 	headerText := "---- APPLICATION COMPONENTS "
 	padding := r.totalWidth - len(headerText)
+	var fullHeaderText string
 	if padding > 0 {
-		headerText += strings.Repeat("-", padding)
+		paddingDashes := fmt.Sprintf("%s%s%s", colorLightGrey, strings.Repeat("-", padding), colorReset)
+		fullHeaderText = fmt.Sprintf("%s%s%s%s", colorLightGrey, "---- APPLICATION COMPONENTS ", colorReset, paddingDashes)
+	} else {
+		fullHeaderText = fmt.Sprintf("%s%s%s", colorLightGrey, headerText, colorReset)
 	}
-	output.WriteString(headerText + "\n")
+	output.WriteString(fullHeaderText + "\n")
 
 	// Core Technologies section
 	output.WriteString("• Core Technologies:\n")
