@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# DPX Web Ergonomics POC - Build Script
-# Cross-platform build script for the dpx-web CLI tool
+# EngX Ergonomics POC - Build Script
+# Cross-platform build script for the engx CLI tool
 
 set -e
 
 # Configuration
-BINARY_NAME="dpx-web"
+BINARY_NAME="engx"
 VERSION=${VERSION:-"dev"}
 COMMIT=${COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
 DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')

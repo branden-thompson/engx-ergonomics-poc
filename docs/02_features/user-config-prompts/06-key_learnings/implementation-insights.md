@@ -88,3 +88,92 @@
 - Terminal history preservation enables better debugging
 - Inline mode supports future color and styling improvements
 - Natural workflow matches developer expectations
+
+## Recent Enhancement Learnings (Session 2)
+
+### 6. Visual Consistency and Color Systems
+**Challenge**: Maintaining consistent visual styling across different UI components
+**Solution**: Implemented comprehensive color system with state-based styling
+**Impact**: Professional appearance with clear visual hierarchy
+
+### 7. Progress Bar Architecture
+**Initial Issue**: Multiple percentage formatting implementations leading to inconsistencies
+**Root Cause**: Different rendering paths for total progress vs step progress
+**Solution**: Modular progress bar system with configurable width and percentage display
+
+#### Modular Progress Bar System
+```go
+type ProgressBarConfig struct {
+    Width           int    // Fixed width or 0 for fill mode
+    ShowPercentage  bool   // Toggle percentage display
+    PercentagePad   int    // Padding for alignment
+    FillMode        bool   // Dynamic width calculation
+}
+```
+
+**Benefits**:
+- Single source of truth for percentage formatting
+- Consistent "100.0%" display across all progress indicators
+- Configurable width for different use cases
+- Eliminates layout calculation errors
+
+### 8. Layout Calculation Edge Cases
+**Discovery**: Dynamic width calculations can result in negative values
+**Issue**: `slice bounds out of range [:-4]` panic when terminal width constraints create impossible layouts
+**Solution**: Comprehensive bounds checking with minimum width enforcement
+**Pattern**: Always validate calculated widths before slice operations
+
+### 9. Component Status Visualization
+**Enhancement**: Modular component installation status system
+**Implementation**: Color-coded status indicators with consistent styling
+- `[queued]` (White)
+- `[installing...]` (Blue)
+- `[skipped]` (Grey Italic)
+- `[installed]` (Green)
+- `[failed]` (Red)
+
+### 10. Floating Point Precision in Percentage Display
+**Subtle Bug**: `fmt.Sprintf("%.1f%%", 100.0)` can produce "100%" instead of "100.0%"
+**Root Cause**: Floating point representation and format string behavior
+**Robust Solution**: Post-processing string correction to ensure consistent format
+```go
+percentText = fmt.Sprintf("%.1f%%", percentage)
+if percentText == "100%" {
+    percentText = "100.0%"
+}
+```
+
+## Enhanced Best Practices
+
+### Modular Component Design
+1. **Configuration Structs** - Use typed configuration for complex components
+2. **Result Types** - Return structured data for layout calculations
+3. **Bounds Validation** - Always validate calculated dimensions
+4. **Color Consistency** - Centralized color system for state-based styling
+
+### Progress Visualization
+1. **Fixed vs Fill Modes** - Choose appropriate sizing strategy based on context
+2. **Percentage Consistency** - Use single formatting function across all displays
+3. **Layout Robustness** - Handle edge cases gracefully with minimums and maximums
+
+### Error Prevention
+1. **Slice Bounds** - Validate all calculated indices before slice operations
+2. **Width Calculations** - Ensure positive values with minimum constraints
+3. **String Formatting** - Post-process format results for consistency
+
+## Performance and UX Impact
+
+### Improved Visual Experience
+- Consistent percentage formatting eliminates user confusion
+- Proper progress bar sizing preserves readability of step names
+- Color-coded status system provides immediate visual feedback
+
+### Code Maintainability
+- Modular progress bar system reduces duplication
+- Centralized styling makes future enhancements easier
+- Robust error handling prevents runtime panics
+
+### Development Velocity
+- Configuration-driven approach allows rapid iteration
+- Reusable components accelerate feature development
+- Comprehensive error handling reduces debugging time
