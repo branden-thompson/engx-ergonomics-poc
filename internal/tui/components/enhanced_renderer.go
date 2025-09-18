@@ -13,7 +13,7 @@ const (
 	colorBrightMagenta = "\033[95m"  // Bright magenta for app name
 	colorBrightOrange  = "\033[38;5;208m"  // Bright orange for PRODUCTION READY
 	colorBlue          = "\033[94m"  // Blue for DEV ONLY
-	colorLightGrey     = "\033[37m"  // Light grey for lines (not too dark, not white)
+	colorLightGrey     = "\033[90m"  // Darker grey for lines (about 10% more grey)
 
 	// Text styles
 	styleBold = "\033[1m"
