@@ -9,6 +9,21 @@ import (
 	"github.com/bthompso/engx-ergonomics-poc/internal/config"
 )
 
+// ANSI escape codes for styling
+const (
+	// Colors
+	colorReset  = "\033[0m"
+	colorGrey   = "\033[90m"   // Bright black (grey)
+
+	// Styles
+	styleItalic = "\033[3m"
+	styleReset  = "\033[23m"   // Reset italic
+
+	// Combined style for responses
+	responseStyle = colorGrey + styleItalic
+	resetStyle    = styleReset + colorReset
+)
+
 // InlinePrompter handles traditional CLI-style prompting
 type InlinePrompter struct {
 	config     *config.PromptConfiguration
@@ -87,12 +102,13 @@ func (ip *InlinePrompter) askPrompt(prompt *config.PromptConfig) error {
 
 		// Validate input
 		if !prompt.IsValidInput(input) {
-			// Show valid options with proper indentation
+			// Show valid options with proper indentation and styling
 			validOptions := make([]string, 0, len(prompt.UserOptions))
 			for option := range prompt.UserOptions {
 				validOptions = append(validOptions, option)
 			}
-			fmt.Printf("  └ Invalid input. Valid options: %s\n", strings.Join(validOptions, ", "))
+			errorMsg := fmt.Sprintf("Invalid input. Valid options: %s", strings.Join(validOptions, ", "))
+			fmt.Printf("  └ %s%s%s\n", responseStyle, errorMsg, resetStyle)
 			continue
 		}
 
@@ -102,16 +118,16 @@ func (ip *InlinePrompter) askPrompt(prompt *config.PromptConfig) error {
 			return err
 		}
 
-		// Show response message with enhanced formatting
+		// Show response message with enhanced formatting (italic grey)
 		responseLines := prompt.GetResponseLines(input)
 		if len(responseLines) > 0 {
 			for i, line := range responseLines {
 				if i == 0 {
-					fmt.Printf("  └ %s\n", line)
+					fmt.Printf("  └ %s%s%s\n", responseStyle, line, resetStyle)
 				} else if i == len(responseLines)-1 {
-					fmt.Printf("  └ %s\n", line)
+					fmt.Printf("  └ %s%s%s\n", responseStyle, line, resetStyle)
 				} else {
-					fmt.Printf("  ├ %s\n", line)
+					fmt.Printf("  ├ %s%s%s\n", responseStyle, line, resetStyle)
 				}
 			}
 		}
