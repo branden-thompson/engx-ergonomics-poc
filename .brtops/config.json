@@ -1,0 +1,23 @@
+{
+  "project": {
+    "name": "dpx-web-ergonomics-poc",
+    "type": "LEVEL-1",
+    "severity": "SEV-0",
+    "category": "POC",
+    "status": "INITIATED",
+    "phase": "RCC"
+  },
+  "brtops": {
+    "version": "1.1.001",
+    "documentation_structure": "enhanced-7-folder",
+    "quality_gates": "SEV-0-full",
+    "collaboration_mode": "HUM LEAD"
+  },
+  "technology": {
+    "primary_language": "TBD",
+    "target_platform": "terminal",
+    "framework": "TBD"
+  },
+  "created": "2025-09-17",
+  "last_updated": "2025-09-17"
+}

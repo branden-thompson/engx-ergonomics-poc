@@ -1,0 +1,47 @@
+# Global DPX Web Configuration
+# This file should be placed at ~/.dpx-web/config.yaml
+#
+# Settings in this file apply to all projects unless overridden
+# by project-specific configuration files.
+
+defaults:
+  verbosity: normal          # normal, verbose, quiet
+  deployment_target: production
+  timeout: 300s
+  theme: auto               # auto, dark, light
+  template: typescript      # typescript, javascript, minimal
+
+environments:
+  development:
+    api_endpoint: "http://localhost:3000"
+    timeout: 30s
+    variables:
+      NODE_ENV: "development"
+      DEBUG: "true"
+
+  staging:
+    api_endpoint: "https://staging.company.com"
+    timeout: 120s
+    variables:
+      NODE_ENV: "staging"
+      DEBUG: "false"
+
+  production:
+    api_endpoint: "https://api.company.com"
+    timeout: 300s
+    variables:
+      NODE_ENV: "production"
+      DEBUG: "false"
+      OPTIMIZE: "true"
+
+# Global command customizations
+custom_commands:
+  test:
+    flags: ["--coverage", "--watchAll=false"]
+    env:
+      CI: "true"
+
+  dev:
+    flags: ["--host", "0.0.0.0"]
+    env:
+      BROWSER: "none"

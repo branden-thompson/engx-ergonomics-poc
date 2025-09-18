@@ -1,0 +1,52 @@
+# Project-specific DPX Web Configuration
+# This file should be placed at .dpx-web/config.yaml in your project root
+#
+# Settings in this file override global configuration for this project only.
+
+project:
+  name: "SampleApp"
+  version: "1.0.0"
+  description: "A sample React application created with DPX Web"
+  repository: "https://github.com/company/sample-app"
+
+# Override global defaults for this project
+defaults:
+  verbosity: verbose        # More detailed output for this project
+  deployment_target: staging  # Default to staging instead of production
+  template: typescript      # Ensure TypeScript is used
+
+# Project-specific environment overrides
+environments:
+  development:
+    api_endpoint: "http://localhost:3001"  # Custom local port
+    variables:
+      REACT_APP_API_KEY: "dev-api-key-123"
+      REACT_APP_FEATURE_FLAGS: "new-ui,beta-features"
+
+  staging:
+    variables:
+      REACT_APP_API_KEY: "staging-api-key-456"
+      REACT_APP_FEATURE_FLAGS: "new-ui"
+
+  production:
+    variables:
+      REACT_APP_API_KEY: "prod-api-key-789"
+      REACT_APP_FEATURE_FLAGS: ""
+
+# Project-specific command customizations
+custom_commands:
+  create:
+    flags: ["--verbose", "--template=typescript"]
+
+  test:
+    flags: ["--coverage", "--testPathPattern=src/", "--collectCoverageFrom=src/**/*.{ts,tsx}"]
+    env:
+      COVERAGE_THRESHOLD: "80"
+
+  build:
+    flags: ["--analyze"]
+    env:
+      GENERATE_SOURCEMAP: "false"
+
+  deploy:
+    flags: ["--staging"]  # Default to staging deployment for this project
