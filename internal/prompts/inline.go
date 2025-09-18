@@ -70,11 +70,11 @@ func (ip *InlinePrompter) RunPrompts(devOnly bool, flags []string) (*config.User
 	return ip.userConfig, nil
 }
 
-// askPrompt handles a single prompt interaction
+// askPrompt handles a single prompt interaction with enhanced formatting
 func (ip *InlinePrompter) askPrompt(prompt *config.PromptConfig) error {
 	for {
-		// Show the question
-		fmt.Printf("%s ", prompt.Question)
+		// Show the question with Claude Code-style formatting
+		fmt.Printf("⏺ %s ", prompt.Question)
 
 		// Read user input
 		input, err := ip.reader.ReadString('\n')
@@ -87,12 +87,12 @@ func (ip *InlinePrompter) askPrompt(prompt *config.PromptConfig) error {
 
 		// Validate input
 		if !prompt.IsValidInput(input) {
-			// Show valid options
+			// Show valid options with proper indentation
 			validOptions := make([]string, 0, len(prompt.UserOptions))
 			for option := range prompt.UserOptions {
 				validOptions = append(validOptions, option)
 			}
-			fmt.Printf("Invalid input. Valid options: %s\n", strings.Join(validOptions, ", "))
+			fmt.Printf("  └ Invalid input. Valid options: %s\n", strings.Join(validOptions, ", "))
 			continue
 		}
 
@@ -102,11 +102,22 @@ func (ip *InlinePrompter) askPrompt(prompt *config.PromptConfig) error {
 			return err
 		}
 
-		// Show response message
-		responseMsg := prompt.GetResponseMessage(input)
-		if responseMsg != "" {
-			fmt.Printf("%s\n", responseMsg)
+		// Show response message with enhanced formatting
+		responseLines := prompt.GetResponseLines(input)
+		if len(responseLines) > 0 {
+			for i, line := range responseLines {
+				if i == 0 {
+					fmt.Printf("  └ %s\n", line)
+				} else if i == len(responseLines)-1 {
+					fmt.Printf("  └ %s\n", line)
+				} else {
+					fmt.Printf("  ├ %s\n", line)
+				}
+			}
 		}
+
+		// Add breathing room between prompts
+		fmt.Println()
 
 		break
 	}

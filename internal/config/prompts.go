@@ -44,7 +44,7 @@ func LoadPromptConfiguration() (*PromptConfiguration, error) {
 			{
 				ID:      "deployment_target",
 				Trigger: "not_dev_only", // Only ask if --dev-only is NOT specified
-				Question: "Will this deploy to: 1) LI Data-Centers 2) Azure Cloud? (1/2)",
+				Question: "Will this deploy to 1) LI Data-Centers, 2) Azure Cloud? (1/2)",
 				UserOptions: map[string]string{
 					"1": "docker",
 					"2": "azure",
@@ -121,6 +121,49 @@ func (p *PromptConfig) GetResponseMessage(userInput string) string {
 	}
 
 	return fmt.Sprintf(p.ResponseFormat, displayValue)
+}
+
+// GetResponseLines returns formatted response lines for enhanced tree display
+func (p *PromptConfig) GetResponseLines(userInput string) []string {
+	// Normalize user input
+	normalizedInput := strings.ToLower(strings.TrimSpace(userInput))
+
+	// Find the config value for this input
+	configValue, exists := p.UserOptions[normalizedInput]
+	if !exists {
+		return []string{}
+	}
+
+	// Return detailed response lines based on prompt type
+	switch p.ID {
+	case "production_data":
+		if configValue == "true" {
+			return []string{
+				"Including production data-access setup...",
+			}
+		} else {
+			return []string{
+				"Bypassing production data-access setup...",
+			}
+		}
+	case "deployment_target":
+		if configValue == "docker" {
+			return []string{
+				"Configuring for Docker Container deployment",
+				"Setting Application to use standard LCD pipelines (can be changed later...)",
+				"Setting fabric to CORP (can be changed later...)",
+			}
+		} else {
+			return []string{
+				"Configuring for Azure Container deployment",
+				"Setting Application to use Azure DevOps pipelines (can be changed later...)",
+				"Setting fabric to CLOUD (can be changed later...)",
+			}
+		}
+	default:
+		// Fallback to single line response
+		return []string{fmt.Sprintf(p.ResponseFormat, configValue)}
+	}
 }
 
 // IsValidInput checks if user input is valid for this prompt
