@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/models"
 	"github.com/bthompso/engx-ergonomics-poc/internal/prompts"
+	"github.com/bthompso/engx-ergonomics-poc/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,19 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			appName := args[0]
 
-			// Collect only explicitly set flags
+			// Determine verbosity level from flags
+			quiet, _ := cmd.Flags().GetBool("quiet")
+			concise, _ := cmd.Flags().GetBool("concise")
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			debug, _ := cmd.Flags().GetBool("debug")
+
+			verbosityLevel := config.DetermineVerbosityLevel(quiet, concise, verbose, debug)
+			verbosityConfig := config.NewVerbosityConfig(verbosityLevel)
+
+			// Debug output for verbosity level determination
+			verbosityConfig.DebugPrint("Verbosity level determined: %s", verbosityLevel.String())
+
+			// Collect only explicitly set flags for display purposes
 			var flags []string
 			if cmd.Flags().Changed("dev-only") && devOnly {
 				flags = append(flags, "--dev-only")
@@ -45,14 +58,18 @@ Examples:
 				flags = append(flags, fmt.Sprintf("--template=%s", template))
 			}
 
-			verbose, _ := cmd.Flags().GetBool("verbose")
+			// Add verbosity flags to display
+			if quiet {
+				flags = append(flags, "--quiet")
+			}
+			if concise {
+				flags = append(flags, "--concise")
+			}
 			if verbose {
 				flags = append(flags, "--verbose")
 			}
-
-			quiet, _ := cmd.Flags().GetBool("quiet")
-			if quiet {
-				flags = append(flags, "--quiet")
+			if debug {
+				flags = append(flags, "--debug")
 			}
 
 			// Run inline prompts first (traditional CLI style)
@@ -70,7 +87,7 @@ Examples:
 			userConfig.ProjectName = appName
 
 			// Initialize and run TUI with configuration already set (inline mode)
-			model := models.NewAppModelWithConfig("create", appName, flags, userConfig)
+			model := models.NewAppModelWithVerbosity("create", appName, flags, userConfig, verbosityConfig)
 
 			// Configure for inline mode with proper input/output handling
 			program := tea.NewProgram(
@@ -79,8 +96,14 @@ Examples:
 				tea.WithOutput(os.Stderr),
 			)
 
-			if _, err := program.Run(); err != nil {
+			finalModel, err := program.Run()
+			if err != nil {
 				return fmt.Errorf("failed to run application: %w", err)
+			}
+
+			// Print AAR after TUI exits if available
+			if appModel, ok := finalModel.(*models.AppModel); ok && appModel.GetAAROutput() != "" {
+				fmt.Print(appModel.GetAAROutput())
 			}
 
 			return nil
