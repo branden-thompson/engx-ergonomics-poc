@@ -231,7 +231,7 @@ func GetErrorScenario(code string) *ErrorScenario {
 
 // GetRandomErrorScenario returns a random error scenario for simulation
 func GetRandomErrorScenario() *ErrorScenario {
-	scenarios := []string{
+	scenarioKeys := []string{
 		"CONFIG_INVALID",
 		"NETWORK_ERROR",
 		"PERMISSION_DENIED",
@@ -241,6 +241,7 @@ func GetRandomErrorScenario() *ErrorScenario {
 
 	// In a real implementation, this would use proper randomization
 	// For demo purposes, return the network error as it's common and relatable
+	_ = scenarioKeys // Acknowledge the variable for future randomization implementation
 	return CreateErrorScenarios["NETWORK_ERROR"]
 }
 

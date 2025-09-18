@@ -7,6 +7,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/bthompso/engx-ergonomics-poc/internal/aar"
+	"github.com/bthompso/engx-ergonomics-poc/internal/config"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/styles"
 	progresssim "github.com/bthompso/engx-ergonomics-poc/internal/simulation/progress"
@@ -17,6 +19,8 @@ type AppState int
 
 const (
 	StateIdle AppState = iota
+	StatePrompting    // NEW: Interactive configuration prompts
+	StateValidating   // NEW: Validate user configuration
 	StatePrompt
 	StateExecuting
 	StateComplete
@@ -29,6 +33,11 @@ type AppModel struct {
 	command    string
 	target     string
 	flags      []string
+
+	// NEW: Prompting and configuration
+	userConfig         *config.UserConfiguration
+	promptOrchestrator PromptOrchestrator
+	skipPrompts        bool
 
 	// UI components
 	spinner    spinner.Model
@@ -51,6 +60,14 @@ type AppModel struct {
 
 	// Completion state
 	completed bool
+
+	// AAR system
+	aarGenerator *aar.AARGenerator
+	showAAR      bool
+	aarOutput    string
+
+	// Verbosity configuration
+	verbosityConfig *config.VerbosityConfig
 }
 
 // getTemplateFromFlags extracts template from flags or returns default
@@ -69,6 +86,12 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 	s.Spinner = spinner.Dot
 	s.Style = styles.InfoStyle
 
+	// Check if we should skip prompts (flags provided)
+	skipPrompts := hasConfigurationFlags(flags)
+
+	// Initialize prompt orchestrator
+	promptOrchestrator := NewPromptOrchestrator(target)
+
 	// Create progress tracker based on command
 	var tracker *progresssim.Tracker
 	var stepNames []string
@@ -83,7 +106,7 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 		}
 		tracker = progresssim.NewCreateTracker(devOnly)
 
-		// Define step names for npm-style renderer
+		// Define step names for npm-style renderer (will be updated based on config)
 		stepNames = []string{
 			"Validating configuration",
 			"Setting up environment",
@@ -95,11 +118,11 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 			stepNames = append(stepNames, "Configuring production setup")
 		}
 
-		stepNames = append(stepNames, "Finalizing setup")
+		stepNames = append(stepNames, "Finalizing Setup")
 	}
 
-	// Create enhanced renderer
-	appName := fmt.Sprintf("React application '%s'", target)
+	// Create enhanced renderer (will be updated with user config later)
+	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := getTemplateFromFlags(flags)
 	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
@@ -107,27 +130,218 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 	// Initialize with empty logs - all info is shown in the template
 	initialLogs := []string{}
 
+	// Initialize AAR generator (will be updated with proper user config later)
+	startTime := time.Now()
+	projectPath := fmt.Sprintf("./%s", target)
+	// For now, use nil config - will be updated when user configuration is available
+	aarGen := aar.NewAARGenerator(tracker, nil, startTime, projectPath)
+
 	return &AppModel{
-		state:     StateIdle,
-		command:   command,
-		target:    target,
-		flags:     flags,
-		spinner:   s,
-		renderer:  renderer,
-		tracker:   tracker,
-		startTime: time.Now(),
-		logs:      initialLogs,
-		completed: false,
+		state:              StateIdle,
+		command:            command,
+		target:             target,
+		flags:              flags,
+		skipPrompts:        skipPrompts,
+		promptOrchestrator: promptOrchestrator,
+		spinner:            s,
+		renderer:           renderer,
+		tracker:            tracker,
+		startTime:          startTime,
+		logs:               initialLogs,
+		completed:          false,
+		aarGenerator:       aarGen,
+		showAAR:            false,
 	}
+}
+
+// NewAppModelWithConfig creates a new app model with pre-configured settings from inline prompts
+func NewAppModelWithConfig(command, target string, flags []string, userConfig *config.UserConfiguration) *AppModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = styles.InfoStyle
+
+	// Extract devOnly flag from flags
+	var devOnly bool = false
+	for _, flag := range flags {
+		if flag == "--dev-only" {
+			devOnly = true
+			break
+		}
+	}
+
+	// Create progress tracker based on command and configuration
+	var tracker *progresssim.Tracker
+	var stepNames []string
+
+	if command == "create" {
+		tracker = progresssim.NewCreateTracker(devOnly)
+
+		// Extract step names directly from tracker to ensure perfect alignment
+		tempTracker := progresssim.NewCreateTracker(devOnly)
+		tempTracker.Start()
+
+		stepNames = make([]string, tempTracker.TotalSteps())
+		for i := 0; i < tempTracker.TotalSteps(); i++ {
+			// Advance to step i
+			for j := 0; j < i; j++ {
+				tempTracker.NextStep()
+			}
+			stepInfo := tempTracker.CurrentStepInfo()
+			if stepInfo != nil {
+				stepNames[i] = stepInfo.Name
+			}
+			// Reset for next iteration
+			tempTracker = progresssim.NewCreateTracker(devOnly)
+			tempTracker.Start()
+		}
+	}
+
+	// Create enhanced renderer with user configuration
+	appName := target
+	targetDir := fmt.Sprintf("./%s", target)
+	template := userConfig.Template.Type.String()
+	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
+
+	// Initialize with empty logs - all info is shown in the template
+	initialLogs := []string{}
+
+	// Initialize AAR generator
+	startTime := time.Now()
+	projectPath := fmt.Sprintf("./%s", target)
+	aarGen := aar.NewAARGenerator(tracker, userConfig, startTime, projectPath)
+
+	return &AppModel{
+		state:              StateIdle,
+		command:            command,
+		target:             target,
+		flags:              flags,
+		userConfig:         userConfig,    // Pre-configured from inline prompts
+		skipPrompts:        true,          // Skip TUI prompts since we already have config
+		promptOrchestrator: PromptOrchestrator{}, // Empty orchestrator since we skip prompts
+		spinner:            s,
+		renderer:           renderer,
+		tracker:            tracker,
+		startTime:          startTime,
+		totalSteps:         tracker.TotalSteps(), // IMPORTANT: Set total steps for progress tracking
+		logs:               initialLogs,
+		completed:          false,
+		aarGenerator:       aarGen,
+		showAAR:            false,
+		verbosityConfig:    config.NewVerbosityConfig(config.VerbosityDefault), // Default verbosity
+	}
+}
+
+// NewAppModelWithVerbosity creates a new app model with pre-configured settings and verbosity control
+func NewAppModelWithVerbosity(command, target string, flags []string, userConfig *config.UserConfiguration, verbosityConfig *config.VerbosityConfig) *AppModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = styles.InfoStyle
+
+	// Extract devOnly flag from flags
+	var devOnly bool = false
+	for _, flag := range flags {
+		if flag == "--dev-only" {
+			devOnly = true
+			break
+		}
+	}
+
+	// Create progress tracker based on command and configuration
+	var tracker *progresssim.Tracker
+	var stepNames []string
+
+	if command == "create" {
+		tracker = progresssim.NewCreateTracker(devOnly)
+
+		// Extract step names directly from tracker to ensure perfect alignment
+		tempTracker := progresssim.NewCreateTracker(devOnly)
+		tempTracker.Start()
+
+		stepNames = make([]string, tempTracker.TotalSteps())
+		for i := 0; i < tempTracker.TotalSteps(); i++ {
+			// Advance to step i
+			for j := 0; j < i; j++ {
+				tempTracker.NextStep()
+			}
+			stepInfo := tempTracker.CurrentStepInfo()
+			if stepInfo != nil {
+				stepNames[i] = stepInfo.Name
+			}
+			// Reset for next iteration
+			tempTracker = progresssim.NewCreateTracker(devOnly)
+			tempTracker.Start()
+		}
+	}
+
+	// Create enhanced renderer with user configuration and verbosity settings
+	appName := target
+	targetDir := fmt.Sprintf("./%s", target)
+	template := userConfig.Template.Type.String()
+	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
+	// TODO: Update renderer to be verbosity-aware
+
+	// Initialize with empty logs - all info is shown in the template
+	initialLogs := []string{}
+
+	// Initialize AAR generator
+	startTime := time.Now()
+	projectPath := fmt.Sprintf("./%s", target)
+	aarGen := aar.NewAARGenerator(tracker, userConfig, startTime, projectPath)
+
+	// Debug output for verbosity configuration
+	verbosityConfig.DebugPrint("AppModel initialized with verbosity level: %s", verbosityConfig.Level.String())
+	verbosityConfig.DebugPrint("Tracker total steps: %d", tracker.TotalSteps())
+
+	return &AppModel{
+		state:              StateIdle,
+		command:            command,
+		target:             target,
+		flags:              flags,
+		userConfig:         userConfig,    // Pre-configured from inline prompts
+		skipPrompts:        true,          // Skip TUI prompts since we already have config
+		promptOrchestrator: PromptOrchestrator{}, // Empty orchestrator since we skip prompts
+		spinner:            s,
+		renderer:           renderer,
+		tracker:            tracker,
+		startTime:          startTime,
+		totalSteps:         tracker.TotalSteps(), // IMPORTANT: Set total steps for progress tracking
+		logs:               initialLogs,
+		completed:          false,
+		aarGenerator:       aarGen,
+		showAAR:            false,
+		verbosityConfig:    verbosityConfig,
+	}
+}
+
+// hasConfigurationFlags checks if configuration flags are provided
+func hasConfigurationFlags(flags []string) bool {
+	for _, flag := range flags {
+		if strings.HasPrefix(flag, "--template=") ||
+			strings.HasPrefix(flag, "--dev-only") ||
+			strings.HasPrefix(flag, "--production") {
+			return true
+		}
+	}
+	return false
 }
 
 // Init implements tea.Model
 func (m *AppModel) Init() tea.Cmd {
-	return tea.Batch(
-		m.spinner.Tick,
-		m.startExecution(),
-		m.progressTicker(),
-	)
+	if m.skipPrompts {
+		// Skip prompting and go straight to execution
+		return tea.Batch(
+			m.spinner.Tick,
+			m.startExecution(),
+			m.progressTicker(),
+		)
+	} else {
+		// Start with prompting
+		m.state = StatePrompting
+		return tea.Batch(
+			m.spinner.Tick,
+			m.promptOrchestrator.Init(),
+		)
+	}
 }
 
 // Update implements tea.Model
@@ -141,19 +355,60 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Handle global key messages first
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
-		case "enter":
-			if m.state == StateComplete || m.state == StateError {
-				return m, tea.Quit
+		// Remove 'q' key handling for inline mode
+		}
+
+		// Handle state-specific key messages
+		switch m.state {
+		case StatePrompting, StateValidating:
+			// Let the prompt orchestrator handle the keys
+			orchestrator, cmd := m.promptOrchestrator.Update(msg)
+			m.promptOrchestrator = orchestrator
+
+			// Check if prompting is complete
+			if m.promptOrchestrator.IsComplete() {
+				m.userConfig = m.promptOrchestrator.GetConfiguration()
+				m.state = StateValidating
+				return m, m.validateAndStartExecution()
 			}
+
+			return m, cmd
+		}
+
+	// Handle prompting messages (like CompletePromptMsg)
+	default:
+		if m.state == StatePrompting || m.state == StateValidating {
+			// Let the prompt orchestrator handle all messages
+			orchestrator, cmd := m.promptOrchestrator.Update(msg)
+			m.promptOrchestrator = orchestrator
+
+			// Check if prompting is complete
+			if m.promptOrchestrator.IsComplete() {
+				m.userConfig = m.promptOrchestrator.GetConfiguration()
+				m.state = StateValidating
+				return m, m.validateAndStartExecution()
+			}
+
+			return m, cmd
 		}
 
 	case ProgressMsg:
 		m.currentStep = msg.Step
 		m.stepName = msg.StepName
 		// Skip adding logs - all information is shown in the template
+
+		// Record step completion to AAR generator
+		if msg.Step > 0 && m.aarGenerator != nil {
+			// Record the previous step as completed
+			stepDuration := time.Since(m.startTime) // Simple duration calculation
+			if msg.Step <= m.totalSteps {
+				m.aarGenerator.RecordStep(m.stepName, aar.StepStatusSuccess, stepDuration, "")
+			}
+		}
 
 		// Mark previous step as complete if we advanced
 		if msg.Step > 0 && m.renderer != nil {
@@ -171,6 +426,20 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Mark final step as complete
 			if m.renderer != nil {
 				m.renderer.CompleteStep(msg.Step-1, time.Since(m.startTime))
+			}
+
+			// Generate AAR if enabled
+			if m.aarGenerator != nil {
+				cmds = append(cmds, func() tea.Msg {
+					return GenerateAARMsg{}
+				})
+			} else {
+				// Auto-quit in inline mode after a brief pause to show completion
+				cmds = append(cmds, tea.Sequence(
+					tea.Tick(time.Millisecond*1500, func(t time.Time) tea.Msg {
+						return tea.Quit()
+					}),
+				))
 			}
 		} else {
 			m.state = StateExecuting
@@ -229,6 +498,54 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state == StateExecuting && m.tracker != nil && !m.tracker.IsCompleted() {
 			cmds = append(cmds, m.nextStep())
 		}
+
+	case GenerateAARMsg:
+		// Generate AAR asynchronously
+		if m.aarGenerator != nil {
+			if m.verbosityConfig != nil {
+				m.verbosityConfig.DebugPrint("GenerateAARMsg received - starting AAR generation")
+			}
+			cmds = append(cmds, func() tea.Msg {
+				summary, err := m.aarGenerator.Generate()
+				if err != nil {
+					if m.verbosityConfig != nil {
+						m.verbosityConfig.DebugPrint("AAR generation failed: %v", err)
+					}
+					// If AAR generation fails, just quit
+					return tea.Quit()
+				}
+
+				if m.verbosityConfig != nil {
+					m.verbosityConfig.DebugPrint("AAR generated successfully, formatting output")
+				}
+
+				// Format the AAR output
+				formatter := aar.NewStandardFormatter(m.width)
+				output := formatter.Format(summary)
+
+				return DisplayAARMsg{
+					AAR:    summary,
+					Output: output,
+				}
+			})
+		} else {
+			if m.verbosityConfig != nil {
+				m.verbosityConfig.DebugPrint("No AAR generator available")
+			}
+		}
+
+	case DisplayAARMsg:
+		// Print AAR to stdout immediately after TUI completion (no delay, immediate quit)
+		if m.verbosityConfig != nil {
+			m.verbosityConfig.DebugPrint("DisplayAARMsg received - printing AAR to stdout")
+		}
+
+		// Store AAR to be printed after TUI exits
+		m.aarOutput = msg.Output
+		m.showAAR = true
+
+		// Quit immediately - the AAR will be printed when the program exits
+		return m, tea.Quit
 	}
 
 	// Progress bar updates are now handled in updateProgressBar method
@@ -240,6 +557,11 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *AppModel) View() string {
 	if m.width == 0 {
 		return "Loading..."
+	}
+
+	// Handle prompting state
+	if m.state == StatePrompting || m.state == StateValidating {
+		return m.promptOrchestrator.View()
 	}
 
 	var output strings.Builder
@@ -261,6 +583,14 @@ func (m *AppModel) View() string {
 	}
 
 	return output.String()
+}
+
+// GetAAROutput returns the stored AAR output for post-TUI display
+func (m *AppModel) GetAAROutput() string {
+	if m.showAAR {
+		return m.aarOutput
+	}
+	return ""
 }
 
 // getSubSteps returns sub-steps for the current step
@@ -300,7 +630,7 @@ func (m *AppModel) getSubSteps(stepName string) []string {
 			"Configuring environment variables",
 			"Preparing deployment scripts",
 		}
-	case "Finalizing setup":
+	case "Finalizing Setup":
 		return []string{
 			"Running initial build test",
 			"Validating project structure",
@@ -316,11 +646,11 @@ func (m *AppModel) getSubSteps(stepName string) []string {
 func (m *AppModel) renderFooter() string {
 	switch m.state {
 	case StateComplete:
-		return styles.SuccessStyle.Render("✨ Success! Press Enter or 'q' to exit")
+		return styles.SuccessStyle.Render("✨ Success! Application created successfully")
 	case StateError:
-		return styles.ErrorStyle.Render("💡 Check output above for troubleshooting. Press Enter or 'q' to exit")
+		return styles.ErrorStyle.Render("💡 Check output above for troubleshooting. Press Ctrl+C to exit")
 	default:
-		return styles.MutedStyle.Render("Press Ctrl+C or 'q' to quit")
+		return styles.MutedStyle.Render("Press Ctrl+C to quit")
 	}
 }
 
@@ -338,6 +668,15 @@ type ErrorMsg struct {
 type ProgressTickMsg struct{}
 
 type StepCheckMsg struct{}
+
+// GenerateAARMsg triggers AAR generation
+type GenerateAARMsg struct{}
+
+// DisplayAARMsg contains the generated AAR for display
+type DisplayAARMsg struct {
+	AAR    *aar.AARSummary
+	Output string
+}
 
 // progressTicker provides continuous updates for smooth progress animation
 func (m *AppModel) progressTicker() tea.Cmd {
@@ -395,4 +734,70 @@ func (m *AppModel) nextStep() tea.Cmd {
 		// Continue checking for step completion
 		return StepCheckMsg{}
 	})
+}
+
+// validateAndStartExecution validates user configuration and starts execution
+func (m *AppModel) validateAndStartExecution() tea.Cmd {
+	if m.userConfig == nil {
+		return tea.Cmd(func() tea.Msg {
+			return ErrorMsg{Error: fmt.Errorf("no user configuration available")}
+		})
+	}
+
+	// Update the renderer and tracker based on user configuration
+	m.updateComponentsFromConfig()
+
+	// Start execution
+	m.state = StateExecuting
+	return tea.Batch(
+		m.startExecution(),
+		m.progressTicker(),
+	)
+}
+
+// updateComponentsFromConfig updates the renderer and tracker based on user configuration
+func (m *AppModel) updateComponentsFromConfig() {
+	if m.userConfig == nil {
+		return
+	}
+
+	// Create tracker first to get the exact step names
+	devOnly := !m.userConfig.ProductionSetup.Docker &&
+		!m.userConfig.ProductionSetup.CI_CD &&
+		!m.userConfig.ProductionSetup.Monitoring &&
+		!m.userConfig.ProductionSetup.Analytics
+
+	// Create new tracker with updated configuration
+	tempTracker := progresssim.NewCreateTracker(devOnly)
+	tempTracker.Start()
+
+	// Extract step names directly from tracker to ensure perfect alignment
+	stepNames := make([]string, tempTracker.TotalSteps())
+	for i := 0; i < tempTracker.TotalSteps(); i++ {
+		// Advance to step i
+		for j := 0; j < i; j++ {
+			tempTracker.NextStep()
+		}
+		stepInfo := tempTracker.CurrentStepInfo()
+		if stepInfo != nil {
+			stepNames[i] = stepInfo.Name
+		}
+		// Reset for next iteration
+		tempTracker = progresssim.NewCreateTracker(devOnly)
+		tempTracker.Start()
+	}
+
+	// Create new tracker with updated configuration
+	m.tracker = progresssim.NewCreateTracker(devOnly)
+	m.totalSteps = m.tracker.TotalSteps()
+
+	// Create new renderer with user configuration
+	appName := m.target
+	targetDir := fmt.Sprintf("./%s", m.target)
+	template := m.userConfig.Template.Type.String()
+	m.renderer = components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
+
+	// Update AAR generator with proper user configuration
+	projectPath := fmt.Sprintf("./%s", m.target)
+	m.aarGenerator = aar.NewAARGenerator(m.tracker, m.userConfig, m.startTime, projectPath)
 }

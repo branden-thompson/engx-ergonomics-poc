@@ -25,10 +25,17 @@ Focus: Terminal UI/UX patterns, not actual application scaffolding.`,
 		Version: fmt.Sprintf("%s (%s) built on %s", version, commit, date),
 	}
 
-	// Add global flags
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
-	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
+	// Add global verbosity flags (mutually exclusive)
+	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Show only essential information")
+	rootCmd.PersistentFlags().Bool("concise", false, "Show less detail with components hidden")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Show enhanced details with progress bars for multi-step")
+	rootCmd.PersistentFlags().Bool("debug", false, "Show maximum verbosity with all system outputs")
+
+	// Other global flags
 	rootCmd.PersistentFlags().String("config", "", "Config file (default searches for .engx/config.yaml)")
+
+	// Mark verbosity flags as mutually exclusive
+	rootCmd.MarkFlagsMutuallyExclusive("quiet", "concise", "verbose", "debug")
 
 	// Add commands
 	rootCmd.AddCommand(commands.NewCreateCommand())
