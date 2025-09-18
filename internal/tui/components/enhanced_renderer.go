@@ -472,7 +472,7 @@ func (r *EnhancedRenderer) renderFooterInfo() string {
 	}
 
 	line2Left := fmt.Sprintf("Estimated Time Remaining: %s", estimatedRemaining)
-	line2Right := fmt.Sprintf("Running Time: %s", elapsedFormatted)
+	line2Right := fmt.Sprintf("Elapsed Time: %s", elapsedFormatted)
 	padding2 := r.totalWidth - len(line2Left) - len(line2Right)
 	if padding2 > 0 {
 		line2 := line2Left + strings.Repeat(" ", padding2) + line2Right
