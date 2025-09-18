@@ -301,7 +301,7 @@ func (r *EnhancedRenderer) renderHeader() string {
 	return fmt.Sprintf("%s\n\n%s", headerText, progressText)
 }
 
-// renderCurrentStepInfo shows the current running step with spinner or completion
+// renderCurrentStepInfo shows the current running step with colored spinner or completion
 func (r *EnhancedRenderer) renderCurrentStepInfo(step Step) string {
 	// Check if all steps are complete
 	allComplete := r.GetOverallProgress() >= 1.0
@@ -309,11 +309,11 @@ func (r *EnhancedRenderer) renderCurrentStepInfo(step Step) string {
 	var message, statusText string
 
 	if allComplete {
-		// Show completion state
+		// Show completion state with green color
 		message = "Completed Successfully"
-		statusText = "✓ Done"
+		statusText = fmt.Sprintf("%s✓ Done%s", colorGreen, colorReset)
 	} else {
-		// Show running state with spinner
+		// Show running state with colored spinner
 		spinnerChars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 		spinnerIndex := int(time.Since(r.startTime)/time.Millisecond/100) % len(spinnerChars)
 		spinner := spinnerChars[spinnerIndex]
@@ -322,11 +322,36 @@ func (r *EnhancedRenderer) renderCurrentStepInfo(step Step) string {
 		if message == "" {
 			message = step.Name
 		}
-		statusText = fmt.Sprintf("%s Running...", spinner)
+
+		// Determine spinner color based on step status
+		var spinnerColor string
+		switch step.Status {
+		case StepPending:
+			spinnerColor = colorWhite // Queued
+		case StepRunning:
+			spinnerColor = colorBlue // Running
+		case StepComplete:
+			spinnerColor = colorGreen // Done
+		case StepError:
+			spinnerColor = colorRed // Failed
+		default:
+			// Determine based on progress
+			if step.Progress >= 1.0 {
+				spinnerColor = colorGreen
+			} else if step.Progress > 0 {
+				spinnerColor = colorBlue
+			} else {
+				spinnerColor = colorWhite
+			}
+		}
+
+		coloredSpinner := fmt.Sprintf("%s%s%s", spinnerColor, spinner, colorReset)
+		statusText = fmt.Sprintf("%s Running...", coloredSpinner)
 	}
 
-	// Calculate spacing to right-align the status
-	maxMessageLength := r.totalWidth - len("Current Step: ") - len(statusText) - 3
+	// Calculate spacing to right-align the status (use plain text lengths for calculation)
+	plainStatusText := "✓ Done"   // Sample status for length calculation
+	maxMessageLength := r.totalWidth - len("Current Step: ") - len(plainStatusText) - 3
 
 	if len(message) > maxMessageLength {
 		message = message[:maxMessageLength-3] + "..."
@@ -338,35 +363,45 @@ func (r *EnhancedRenderer) renderCurrentStepInfo(step Step) string {
 
 // renderStepLine creates a single aligned step line with dynamic width
 func (r *EnhancedRenderer) renderStepLine(index int, step Step) string {
-	// Status icon
+	// Status icon with colors
 	var icon string
 	switch step.Status {
 	case StepPending:
-		icon = "[ ]"
+		icon = fmt.Sprintf("%s[ ]%s", colorWhite, colorReset)
 	case StepRunning:
-		icon = "[✓ ]" // Note the space after checkmark for running steps
+		icon = fmt.Sprintf("%s[✓ ]%s", colorBlue, colorReset) // Blue for running
 	case StepComplete:
-		icon = "[✓]"
+		icon = fmt.Sprintf("%s[✓]%s", colorGreen, colorReset) // Green for complete
 	case StepError:
-		icon = "[✗]"
+		icon = fmt.Sprintf("%s[✗]%s", colorRed, colorReset) // Red for error
 	}
 
-	// Progress percentage - ensure 0.0% instead of 0.
-	var progressPercent string
-	progress := step.Progress * 100
-
-	// Force explicit formatting to prevent any edge cases
-	if progress <= 0.0 {
-		progressPercent = " 0.0%"  // Explicit format
-	} else if progress >= 100.0 {
-		progressPercent = "100.0%"  // Explicit format
-	} else {
-		progressPercent = fmt.Sprintf("%5.1f%%", progress)
+	// Determine progress state based on step status and progress
+	var progressState ProgressState
+	switch step.Status {
+	case StepPending:
+		progressState = StateQueued
+	case StepRunning:
+		progressState = StateRunning
+	case StepComplete:
+		progressState = StateDone
+	case StepError:
+		progressState = StateFailed
+	default:
+		// Fallback based on progress value
+		if step.Progress >= 1.0 {
+			progressState = StateDone
+		} else if step.Progress > 0 {
+			progressState = StateRunning
+		} else {
+			progressState = StateQueued
+		}
 	}
 
-	// Calculate dynamic progress bar width
-	// Total width - icon - spaces - percentage = remaining for step name and progress bar
-	remainingWidth := r.totalWidth - len(icon) - 1 - 1 - len(progressPercent)
+	// Calculate dynamic progress bar width (account for plain icon text for spacing)
+	plainIcon := "[ ]" // Use plain icon for width calculation
+	plainProgressPercent := " 0.0%" // Use sample percentage for width calculation
+	remainingWidth := r.totalWidth - len(plainIcon) - 1 - 1 - len(plainProgressPercent)
 
 	// Use 30 chars for progress bar, rest for step name
 	progressBarWidth := 30
@@ -381,8 +416,9 @@ func (r *EnhancedRenderer) renderStepLine(index int, step Step) string {
 	// Pad step name to calculated width
 	stepNamePadded := fmt.Sprintf("%-*s", stepNameWidth, stepName)
 
-	// Progress bar
-	progressBar := r.renderProgressBar(step.Progress, progressBarWidth)
+	// Colored progress bar and percentage
+	progressBar := r.renderProgressBarWithState(step.Progress, progressBarWidth, progressState)
+	progressPercent := r.renderColoredPercentage(step.Progress, progressState)
 
 	// Combine with proper spacing
 	return fmt.Sprintf("%s %s %s %s", icon, stepNamePadded, progressBar, progressPercent)
