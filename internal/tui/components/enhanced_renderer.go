@@ -8,16 +8,24 @@ import (
 
 // ANSI color codes for styling
 const (
-	// Colors for header elements
-	colorReset       = "\033[0m"
-	colorBrightMagenta = "\033[95m"  // Bright magenta for app name
+	// Basic colors
+	colorReset         = "\033[0m"
+	colorWhite         = "\033[97m"  // Bright white
+	colorBlue          = "\033[94m"  // Blue for running/installing
+	colorYellow        = "\033[93m"  // Yellow for stalling/paused/JavaScript
+	colorRed           = "\033[91m"  // Red for failed
+	colorGreen         = "\033[92m"  // Green for done/installed
+	colorLightGrey     = "\033[90m"  // Darker grey for lines
+	colorGrey          = "\033[37m"  // Light grey for skipped items
+
+	// Header-specific colors
+	colorBrightMagenta = "\033[95m"  // Bright magenta for app name/paths
 	colorBrightOrange  = "\033[38;5;208m"  // Bright orange for PRODUCTION READY
-	colorBlue          = "\033[94m"  // Blue for DEV ONLY
-	colorLightGrey     = "\033[90m"  // Darker grey for lines (about 10% more grey)
 
 	// Text styles
-	styleBold = "\033[1m"
-	styleReset = "\033[22m"
+	styleBold   = "\033[1m"
+	styleItalic = "\033[3m"
+	styleReset  = "\033[22m"
 )
 
 // Helper function to create colored separator lines
@@ -272,18 +280,21 @@ func (r *EnhancedRenderer) renderHeader() string {
 		headerText = dashPrefix + creatingText + coloredSetupType + endDashes
 	}
 
-	// Total progress line
+	// Total progress line with colored progress bar and percentage
 	overallProgress := r.GetOverallProgress()
-	totalProgressBar := r.renderProgressBar(overallProgress, 47) // Adjusted for new format
 
-	// Format progress percentage consistently
-	var overallProgressPercent string
-	totalProgress := overallProgress * 100
-	if totalProgress == 0.0 {
-		overallProgressPercent = "0.0%"
+	// Determine overall progress state
+	var progressState ProgressState
+	if overallProgress >= 1.0 {
+		progressState = StateDone
+	} else if overallProgress > 0 {
+		progressState = StateRunning
 	} else {
-		overallProgressPercent = fmt.Sprintf("%.1f%%", totalProgress)
+		progressState = StateQueued
 	}
+
+	totalProgressBar := r.renderProgressBarWithState(overallProgress, 47, progressState)
+	overallProgressPercent := r.renderColoredPercentage(overallProgress, progressState)
 
 	progressText := fmt.Sprintf("Total Progress: %s %6s", totalProgressBar, overallProgressPercent)
 
@@ -379,21 +390,34 @@ func (r *EnhancedRenderer) renderStepLine(index int, step Step) string {
 
 // renderFooterInfo creates the footer with timing and directory info
 func (r *EnhancedRenderer) renderFooterInfo() string {
-	// First line: Target Directory and Template
-	var templateDisplay string
+	// First line: Target Directory and Template with colors
+	var templateDisplay, templateColor string
 	switch strings.ToLower(r.template) {
 	case "typescript":
 		templateDisplay = "TypeScript"
+		templateColor = colorBlue // Blue for TypeScript
 	case "javascript":
 		templateDisplay = "JavaScript"
+		templateColor = colorYellow // Yellow for JavaScript
 	default:
 		templateDisplay = r.template
+		templateColor = colorWhite // Default white
 	}
 
-	line1 := fmt.Sprintf("Target Directory: %s", r.targetDir)
-	padding1 := r.totalWidth - len(line1) - len(templateDisplay)
+	// Color the directory path bright magenta
+	coloredTargetDir := fmt.Sprintf("%s%s%s", colorBrightMagenta, r.targetDir, colorReset)
+	coloredTemplate := fmt.Sprintf("%s%s%s", templateColor, templateDisplay, colorReset)
+
+	// Calculate padding accounting for the original text length (without color codes)
+	plainLine1 := fmt.Sprintf("Target Directory: %s", r.targetDir)
+	plainTemplatePart := templateDisplay
+	padding1 := r.totalWidth - len(plainLine1) - len(plainTemplatePart)
+
+	var line1 string
 	if padding1 > 0 {
-		line1 += strings.Repeat(" ", padding1) + templateDisplay
+		line1 = fmt.Sprintf("Target Directory: %s%s%s", coloredTargetDir, strings.Repeat(" ", padding1), coloredTemplate)
+	} else {
+		line1 = fmt.Sprintf("Target Directory: %s %s", coloredTargetDir, coloredTemplate)
 	}
 
 	// Second line: Timing information
@@ -425,15 +449,20 @@ func (r *EnhancedRenderer) renderFooterInfo() string {
 func (r *EnhancedRenderer) renderApplicationComponents() string {
 	var output strings.Builder
 
-	// Section header - simple format to match template
+	// Section header - white title with grey dashes
 	headerText := "---- APPLICATION COMPONENTS "
 	padding := r.totalWidth - len(headerText)
 	var fullHeaderText string
 	if padding > 0 {
 		paddingDashes := fmt.Sprintf("%s%s%s", colorLightGrey, strings.Repeat("-", padding), colorReset)
-		fullHeaderText = fmt.Sprintf("%s%s%s%s", colorLightGrey, "---- APPLICATION COMPONENTS ", colorReset, paddingDashes)
+		// Use grey for dashes but white for title
+		dashPrefix := fmt.Sprintf("%s----%s", colorLightGrey, colorReset)
+		whiteTitle := fmt.Sprintf("%s APPLICATION COMPONENTS %s", colorWhite, colorReset)
+		fullHeaderText = dashPrefix + whiteTitle + paddingDashes
 	} else {
-		fullHeaderText = fmt.Sprintf("%s%s%s", colorLightGrey, headerText, colorReset)
+		dashPrefix := fmt.Sprintf("%s----%s", colorLightGrey, colorReset)
+		whiteTitle := fmt.Sprintf("%s APPLICATION COMPONENTS %s", colorWhite, colorReset)
+		fullHeaderText = dashPrefix + whiteTitle
 	}
 	output.WriteString(fullHeaderText + "\n")
 
@@ -499,8 +528,24 @@ func (r *EnhancedRenderer) renderComponentLine(component Component) string {
 	return fmt.Sprintf("  %s %s %s\n", component.Icon, componentNamePadded, statusDisplay)
 }
 
-// renderProgressBar creates a progress bar with the specified width
+// ProgressState represents different states for progress visualization
+type ProgressState int
+
+const (
+	StateQueued ProgressState = iota
+	StateRunning
+	StateStalling
+	StateFailed
+	StateDone
+)
+
+// renderProgressBar creates a colored progress bar with the specified width
 func (r *EnhancedRenderer) renderProgressBar(progress float64, width int) string {
+	return r.renderProgressBarWithState(progress, width, StateRunning)
+}
+
+// renderProgressBarWithState creates a colored progress bar with specific state
+func (r *EnhancedRenderer) renderProgressBarWithState(progress float64, width int, state ProgressState) string {
 	filled := int(progress * float64(width))
 	empty := width - filled
 
@@ -511,8 +556,72 @@ func (r *EnhancedRenderer) renderProgressBar(progress float64, width int) string
 		empty = 0
 	}
 
-	bar := strings.Repeat("#", filled) + strings.Repeat(" ", empty)
-	return fmt.Sprintf("[%s]", bar)
+	// Determine color based on state
+	var barColor string
+	switch state {
+	case StateQueued:
+		barColor = colorWhite
+	case StateRunning:
+		barColor = colorBlue
+	case StateStalling:
+		barColor = colorYellow
+	case StateFailed:
+		barColor = colorRed
+	case StateDone:
+		barColor = colorGreen
+	default:
+		// If progress is 100%, use green regardless of state
+		if progress >= 1.0 {
+			barColor = colorGreen
+		} else if progress > 0 {
+			barColor = colorBlue
+		} else {
+			barColor = colorWhite
+		}
+	}
+
+	// Create colored progress bar
+	coloredFilled := fmt.Sprintf("%s%s%s", barColor, strings.Repeat("#", filled), colorReset)
+	emptySpace := strings.Repeat(" ", empty)
+
+	return fmt.Sprintf("[%s%s]", coloredFilled, emptySpace)
+}
+
+// renderColoredPercentage colors percentage text to match progress bar state
+func (r *EnhancedRenderer) renderColoredPercentage(progress float64, state ProgressState) string {
+	// Calculate percentage
+	percentage := progress * 100
+	var percentText string
+	if percentage == 0.0 {
+		percentText = "0.0%"
+	} else {
+		percentText = fmt.Sprintf("%.1f%%", percentage)
+	}
+
+	// Determine color based on state (same logic as progress bars)
+	var percentColor string
+	switch state {
+	case StateQueued:
+		percentColor = colorWhite
+	case StateRunning:
+		percentColor = colorBlue
+	case StateStalling:
+		percentColor = colorYellow
+	case StateFailed:
+		percentColor = colorRed
+	case StateDone:
+		percentColor = colorGreen
+	default:
+		if progress >= 1.0 {
+			percentColor = colorGreen
+		} else if progress > 0 {
+			percentColor = colorBlue
+		} else {
+			percentColor = colorWhite
+		}
+	}
+
+	return fmt.Sprintf("%s%s%s", percentColor, percentText, colorReset)
 }
 
 // formatDuration formats a duration into HH:MM:SS format

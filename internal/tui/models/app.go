@@ -113,7 +113,7 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 	}
 
 	// Create enhanced renderer (will be updated with user config later)
-	appName := fmt.Sprintf("React application '%s'", target)
+	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := getTemplateFromFlags(flags)
 	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
@@ -180,7 +180,7 @@ func NewAppModelWithConfig(command, target string, flags []string, userConfig *c
 	}
 
 	// Create enhanced renderer with user configuration
-	appName := fmt.Sprintf("React application '%s'", target)
+	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := userConfig.Template.Type.String()
 	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
@@ -602,7 +602,7 @@ func (m *AppModel) updateComponentsFromConfig() {
 	m.totalSteps = m.tracker.TotalSteps()
 
 	// Create new renderer with user configuration
-	appName := fmt.Sprintf("React application '%s'", m.target)
+	appName := m.target
 	targetDir := fmt.Sprintf("./%s", m.target)
 	template := m.userConfig.Template.Type.String()
 	m.renderer = components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
