@@ -86,9 +86,29 @@ func NewCreateTracker(devOnly bool) *Tracker {
 		})
 	}
 
+	// Add testing frameworks step
+	steps = append(steps, Step{
+		Name:        "Installing Testing Frameworks",
+		Message:     "🧪 Setting up testing infrastructure...",
+		Duration:    time.Millisecond * 1800,
+		ErrorRate:   0.05, // 5% chance of testing setup error
+		CanRetry:    true,
+		Description: "Installs and configures Vitest, testing utilities, and coverage tools",
+	})
+
+	// Add documentation generation step
+	steps = append(steps, Step{
+		Name:        "Generating Documentation",
+		Message:     "📚 Creating project documentation...",
+		Duration:    time.Millisecond * 1200,
+		ErrorRate:   0.02, // 2% chance of documentation error
+		CanRetry:    true,
+		Description: "Generates README, API docs, and component documentation",
+	})
+
 	// Final step
 	steps = append(steps, Step{
-		Name:        "Finalizing setup",
+		Name:        "Finalizing Setup",
 		Message:     "✨ Project ready for development!",
 		Duration:    time.Millisecond * 800,
 		ErrorRate:   0.0, // No errors on final step

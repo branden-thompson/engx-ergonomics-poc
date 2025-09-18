@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/bthompso/engx-ergonomics-poc/internal/config"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/styles"
 	progresssim "github.com/bthompso/engx-ergonomics-poc/internal/simulation/progress"
@@ -17,6 +18,8 @@ type AppState int
 
 const (
 	StateIdle AppState = iota
+	StatePrompting    // NEW: Interactive configuration prompts
+	StateValidating   // NEW: Validate user configuration
 	StatePrompt
 	StateExecuting
 	StateComplete
@@ -29,6 +32,11 @@ type AppModel struct {
 	command    string
 	target     string
 	flags      []string
+
+	// NEW: Prompting and configuration
+	userConfig         *config.UserConfiguration
+	promptOrchestrator PromptOrchestrator
+	skipPrompts        bool
 
 	// UI components
 	spinner    spinner.Model
@@ -69,6 +77,12 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 	s.Spinner = spinner.Dot
 	s.Style = styles.InfoStyle
 
+	// Check if we should skip prompts (flags provided)
+	skipPrompts := hasConfigurationFlags(flags)
+
+	// Initialize prompt orchestrator
+	promptOrchestrator := NewPromptOrchestrator(target)
+
 	// Create progress tracker based on command
 	var tracker *progresssim.Tracker
 	var stepNames []string
@@ -83,7 +97,7 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 		}
 		tracker = progresssim.NewCreateTracker(devOnly)
 
-		// Define step names for npm-style renderer
+		// Define step names for npm-style renderer (will be updated based on config)
 		stepNames = []string{
 			"Validating configuration",
 			"Setting up environment",
@@ -95,11 +109,11 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 			stepNames = append(stepNames, "Configuring production setup")
 		}
 
-		stepNames = append(stepNames, "Finalizing setup")
+		stepNames = append(stepNames, "Finalizing Setup")
 	}
 
-	// Create enhanced renderer
-	appName := fmt.Sprintf("React application '%s'", target)
+	// Create enhanced renderer (will be updated with user config later)
+	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := getTemplateFromFlags(flags)
 	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
@@ -108,26 +122,118 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 	initialLogs := []string{}
 
 	return &AppModel{
-		state:     StateIdle,
-		command:   command,
-		target:    target,
-		flags:     flags,
-		spinner:   s,
-		renderer:  renderer,
-		tracker:   tracker,
-		startTime: time.Now(),
-		logs:      initialLogs,
-		completed: false,
+		state:              StateIdle,
+		command:            command,
+		target:             target,
+		flags:              flags,
+		skipPrompts:        skipPrompts,
+		promptOrchestrator: promptOrchestrator,
+		spinner:            s,
+		renderer:           renderer,
+		tracker:            tracker,
+		startTime:          time.Now(),
+		logs:               initialLogs,
+		completed:          false,
 	}
+}
+
+// NewAppModelWithConfig creates a new app model with pre-configured settings from inline prompts
+func NewAppModelWithConfig(command, target string, flags []string, userConfig *config.UserConfiguration) *AppModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = styles.InfoStyle
+
+	// Extract devOnly flag from flags
+	var devOnly bool = false
+	for _, flag := range flags {
+		if flag == "--dev-only" {
+			devOnly = true
+			break
+		}
+	}
+
+	// Create progress tracker based on command and configuration
+	var tracker *progresssim.Tracker
+	var stepNames []string
+
+	if command == "create" {
+		tracker = progresssim.NewCreateTracker(devOnly)
+
+		// Extract step names directly from tracker to ensure perfect alignment
+		tempTracker := progresssim.NewCreateTracker(devOnly)
+		tempTracker.Start()
+
+		stepNames = make([]string, tempTracker.TotalSteps())
+		for i := 0; i < tempTracker.TotalSteps(); i++ {
+			// Advance to step i
+			for j := 0; j < i; j++ {
+				tempTracker.NextStep()
+			}
+			stepInfo := tempTracker.CurrentStepInfo()
+			if stepInfo != nil {
+				stepNames[i] = stepInfo.Name
+			}
+			// Reset for next iteration
+			tempTracker = progresssim.NewCreateTracker(devOnly)
+			tempTracker.Start()
+		}
+	}
+
+	// Create enhanced renderer with user configuration
+	appName := target
+	targetDir := fmt.Sprintf("./%s", target)
+	template := userConfig.Template.Type.String()
+	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
+
+	// Initialize with empty logs - all info is shown in the template
+	initialLogs := []string{}
+
+	return &AppModel{
+		state:              StateIdle,
+		command:            command,
+		target:             target,
+		flags:              flags,
+		userConfig:         userConfig,    // Pre-configured from inline prompts
+		skipPrompts:        true,          // Skip TUI prompts since we already have config
+		promptOrchestrator: PromptOrchestrator{}, // Empty orchestrator since we skip prompts
+		spinner:            s,
+		renderer:           renderer,
+		tracker:            tracker,
+		startTime:          time.Now(),
+		logs:               initialLogs,
+		completed:          false,
+	}
+}
+
+// hasConfigurationFlags checks if configuration flags are provided
+func hasConfigurationFlags(flags []string) bool {
+	for _, flag := range flags {
+		if strings.HasPrefix(flag, "--template=") ||
+			strings.HasPrefix(flag, "--dev-only") ||
+			strings.HasPrefix(flag, "--production") {
+			return true
+		}
+	}
+	return false
 }
 
 // Init implements tea.Model
 func (m *AppModel) Init() tea.Cmd {
-	return tea.Batch(
-		m.spinner.Tick,
-		m.startExecution(),
-		m.progressTicker(),
-	)
+	if m.skipPrompts {
+		// Skip prompting and go straight to execution
+		return tea.Batch(
+			m.spinner.Tick,
+			m.startExecution(),
+			m.progressTicker(),
+		)
+	} else {
+		// Start with prompting
+		m.state = StatePrompting
+		return tea.Batch(
+			m.spinner.Tick,
+			m.promptOrchestrator.Init(),
+		)
+	}
 }
 
 // Update implements tea.Model
@@ -141,13 +247,45 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Handle global key messages first
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
-		case "enter":
-			if m.state == StateComplete || m.state == StateError {
-				return m, tea.Quit
+		// Remove 'q' key handling for inline mode
+		}
+
+		// Handle state-specific key messages
+		switch m.state {
+		case StatePrompting, StateValidating:
+			// Let the prompt orchestrator handle the keys
+			orchestrator, cmd := m.promptOrchestrator.Update(msg)
+			m.promptOrchestrator = orchestrator
+
+			// Check if prompting is complete
+			if m.promptOrchestrator.IsComplete() {
+				m.userConfig = m.promptOrchestrator.GetConfiguration()
+				m.state = StateValidating
+				return m, m.validateAndStartExecution()
 			}
+
+			return m, cmd
+		}
+
+	// Handle prompting messages (like CompletePromptMsg)
+	default:
+		if m.state == StatePrompting || m.state == StateValidating {
+			// Let the prompt orchestrator handle all messages
+			orchestrator, cmd := m.promptOrchestrator.Update(msg)
+			m.promptOrchestrator = orchestrator
+
+			// Check if prompting is complete
+			if m.promptOrchestrator.IsComplete() {
+				m.userConfig = m.promptOrchestrator.GetConfiguration()
+				m.state = StateValidating
+				return m, m.validateAndStartExecution()
+			}
+
+			return m, cmd
 		}
 
 	case ProgressMsg:
@@ -172,6 +310,12 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.renderer != nil {
 				m.renderer.CompleteStep(msg.Step-1, time.Since(m.startTime))
 			}
+			// Auto-quit in inline mode after a brief pause to show completion
+			cmds = append(cmds, tea.Sequence(
+				tea.Tick(time.Millisecond*500, func(t time.Time) tea.Msg {
+					return tea.Quit()
+				}),
+			))
 		} else {
 			m.state = StateExecuting
 		}
@@ -242,6 +386,11 @@ func (m *AppModel) View() string {
 		return "Loading..."
 	}
 
+	// Handle prompting state
+	if m.state == StatePrompting || m.state == StateValidating {
+		return m.promptOrchestrator.View()
+	}
+
 	var output strings.Builder
 
 	// Use npm-style renderer for main progress display
@@ -300,7 +449,7 @@ func (m *AppModel) getSubSteps(stepName string) []string {
 			"Configuring environment variables",
 			"Preparing deployment scripts",
 		}
-	case "Finalizing setup":
+	case "Finalizing Setup":
 		return []string{
 			"Running initial build test",
 			"Validating project structure",
@@ -316,11 +465,11 @@ func (m *AppModel) getSubSteps(stepName string) []string {
 func (m *AppModel) renderFooter() string {
 	switch m.state {
 	case StateComplete:
-		return styles.SuccessStyle.Render("✨ Success! Press Enter or 'q' to exit")
+		return styles.SuccessStyle.Render("✨ Success! Application created successfully")
 	case StateError:
-		return styles.ErrorStyle.Render("💡 Check output above for troubleshooting. Press Enter or 'q' to exit")
+		return styles.ErrorStyle.Render("💡 Check output above for troubleshooting. Press Ctrl+C to exit")
 	default:
-		return styles.MutedStyle.Render("Press Ctrl+C or 'q' to quit")
+		return styles.MutedStyle.Render("Press Ctrl+C to quit")
 	}
 }
 
@@ -395,4 +544,66 @@ func (m *AppModel) nextStep() tea.Cmd {
 		// Continue checking for step completion
 		return StepCheckMsg{}
 	})
+}
+
+// validateAndStartExecution validates user configuration and starts execution
+func (m *AppModel) validateAndStartExecution() tea.Cmd {
+	if m.userConfig == nil {
+		return tea.Cmd(func() tea.Msg {
+			return ErrorMsg{Error: fmt.Errorf("no user configuration available")}
+		})
+	}
+
+	// Update the renderer and tracker based on user configuration
+	m.updateComponentsFromConfig()
+
+	// Start execution
+	m.state = StateExecuting
+	return tea.Batch(
+		m.startExecution(),
+		m.progressTicker(),
+	)
+}
+
+// updateComponentsFromConfig updates the renderer and tracker based on user configuration
+func (m *AppModel) updateComponentsFromConfig() {
+	if m.userConfig == nil {
+		return
+	}
+
+	// Create tracker first to get the exact step names
+	devOnly := !m.userConfig.ProductionSetup.Docker &&
+		!m.userConfig.ProductionSetup.CI_CD &&
+		!m.userConfig.ProductionSetup.Monitoring &&
+		!m.userConfig.ProductionSetup.Analytics
+
+	// Create new tracker with updated configuration
+	tempTracker := progresssim.NewCreateTracker(devOnly)
+	tempTracker.Start()
+
+	// Extract step names directly from tracker to ensure perfect alignment
+	stepNames := make([]string, tempTracker.TotalSteps())
+	for i := 0; i < tempTracker.TotalSteps(); i++ {
+		// Advance to step i
+		for j := 0; j < i; j++ {
+			tempTracker.NextStep()
+		}
+		stepInfo := tempTracker.CurrentStepInfo()
+		if stepInfo != nil {
+			stepNames[i] = stepInfo.Name
+		}
+		// Reset for next iteration
+		tempTracker = progresssim.NewCreateTracker(devOnly)
+		tempTracker.Start()
+	}
+
+	// Create new tracker with updated configuration
+	m.tracker = progresssim.NewCreateTracker(devOnly)
+	m.totalSteps = m.tracker.TotalSteps()
+
+	// Create new renderer with user configuration
+	appName := m.target
+	targetDir := fmt.Sprintf("./%s", m.target)
+	template := m.userConfig.Template.Type.String()
+	m.renderer = components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
 }
