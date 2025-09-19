@@ -39,6 +39,7 @@ Focus: Terminal UI/UX patterns, not actual application scaffolding.`,
 
 	// Add commands
 	rootCmd.AddCommand(commands.NewCreateCommand())
+	rootCmd.AddCommand(commands.NewTestErrorCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

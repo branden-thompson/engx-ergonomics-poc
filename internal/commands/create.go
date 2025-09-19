@@ -8,6 +8,7 @@ import (
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/models"
 	"github.com/bthompso/engx-ergonomics-poc/internal/prompts"
 	"github.com/bthompso/engx-ergonomics-poc/internal/config"
+	"github.com/bthompso/engx-ergonomics-poc/internal/chaos"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +16,10 @@ import (
 func NewCreateCommand() *cobra.Command {
 	var devOnly bool
 	var template string
+	var chaosMarine bool
+	var chaosLevel string
+	var chaosSeed int64
+	var chaosConfig string
 
 	cmd := &cobra.Command{
 		Use:   "create [APP_NAME]",
@@ -32,7 +37,9 @@ Examples:
   engx create MyApp
   engx create MyApp --dev-only
   engx create MyApp --template=typescript
-  engx create MyApp --verbose`,
+  engx create MyApp --verbose
+  engx create MyApp --chaos-marine --chaos-level=scout
+  engx create MyApp --chaos-marine --chaos-level=aggressive --chaos-seed=12345`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			appName := args[0]
@@ -49,6 +56,22 @@ Examples:
 			// Debug output for verbosity level determination
 			verbosityConfig.DebugPrint("Verbosity level determined: %s", verbosityLevel.String())
 
+			// Initialize chaos configuration if chaos marine is enabled
+			var chaosInjector chaos.ChaosInjector
+			if chaosMarine {
+				chaosConfig, err := chaos.LoadChaosConfig(chaosLevel, chaosSeed, chaosConfig)
+				if err != nil {
+					return fmt.Errorf("failed to load chaos configuration: %w", err)
+				}
+
+				chaosInjector, err = chaos.NewSafeChaosInjector(chaosConfig)
+				if err != nil {
+					return fmt.Errorf("failed to initialize chaos injector: %w", err)
+				}
+
+				verbosityConfig.DebugPrint("Chaos Marine enabled: level=%s, seed=%d", chaosLevel, chaosSeed)
+			}
+
 			// Collect only explicitly set flags for display purposes
 			var flags []string
 			if cmd.Flags().Changed("dev-only") && devOnly {
@@ -56,6 +79,18 @@ Examples:
 			}
 			if cmd.Flags().Changed("template") && template != "" {
 				flags = append(flags, fmt.Sprintf("--template=%s", template))
+			}
+			if cmd.Flags().Changed("chaos-marine") && chaosMarine {
+				flags = append(flags, "--chaos-marine")
+			}
+			if cmd.Flags().Changed("chaos-level") && chaosLevel != "" {
+				flags = append(flags, fmt.Sprintf("--chaos-level=%s", chaosLevel))
+			}
+			if cmd.Flags().Changed("chaos-seed") && chaosSeed != 0 {
+				flags = append(flags, fmt.Sprintf("--chaos-seed=%d", chaosSeed))
+			}
+			if cmd.Flags().Changed("chaos-config") && chaosConfig != "" {
+				flags = append(flags, fmt.Sprintf("--chaos-config=%s", chaosConfig))
 			}
 
 			// Add verbosity flags to display
@@ -87,7 +122,12 @@ Examples:
 			userConfig.ProjectName = appName
 
 			// Initialize and run TUI with configuration already set (inline mode)
-			model := models.NewAppModelWithVerbosity("create", appName, flags, userConfig, verbosityConfig)
+			var model *models.AppModel
+			if chaosInjector != nil {
+				model = models.NewAppModelWithChaos("create", appName, flags, userConfig, verbosityConfig, chaosInjector)
+			} else {
+				model = models.NewAppModelWithVerbosity("create", appName, flags, userConfig, verbosityConfig)
+			}
 
 			// Configure for inline mode with proper input/output handling
 			program := tea.NewProgram(
@@ -113,6 +153,12 @@ Examples:
 	// Add command-specific flags
 	cmd.Flags().BoolVar(&devOnly, "dev-only", false, "Create app for development only (skip production setup)")
 	cmd.Flags().StringVar(&template, "template", "", "Template to use (typescript, javascript, minimal)")
+
+	// Add chaos marine flags
+	cmd.Flags().BoolVar(&chaosMarine, "chaos-marine", false, "Enable chaos injection for failure simulation")
+	cmd.Flags().StringVar(&chaosLevel, "chaos-level", "default", "Chaos aggressiveness level (off, default, scout, aggressive, invasive, apocalyptic)")
+	cmd.Flags().Int64Var(&chaosSeed, "chaos-seed", 0, "Random seed for deterministic chaos (0 = random)")
+	cmd.Flags().StringVar(&chaosConfig, "chaos-config", "", "Path to chaos configuration file")
 
 	return cmd
 }

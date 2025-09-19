@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/styles"
 	progresssim "github.com/bthompso/engx-ergonomics-poc/internal/simulation/progress"
+	"github.com/bthompso/engx-ergonomics-poc/internal/chaos"
 )
 
 // AppState represents the current state of the application
@@ -45,6 +47,7 @@ type AppModel struct {
 
 	// Progress tracking
 	tracker    *progresssim.Tracker
+	chaosTracker *chaos.ChaosAwareTracker
 	startTime  time.Time
 
 	// Execution state
@@ -452,6 +455,21 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.error = msg.Error
 		// Skip adding error logs - errors will be shown in footer
 
+	case ChaosErrorMsg:
+		m.state = StateError
+		// Format chaos error using the template
+		severityLevel := chaos.SeverityCritical // Default to critical
+		errorOutput := msg.Template.FormatError(severityLevel)
+		m.error = fmt.Errorf("chaos injection in step '%s':\n%s", msg.StepName, errorOutput)
+
+		// For testing: if CHAOS_MARINE_FORCE_INJECTION is set, exit immediately to show the error
+		if os.Getenv("CHAOS_MARINE_FORCE_INJECTION") == "true" {
+			// Print error to stderr and exit for testing
+			fmt.Fprint(os.Stderr, errorOutput)
+			fmt.Fprintln(os.Stderr)
+			os.Exit(1)
+		}
+
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
@@ -564,6 +582,21 @@ func (m *AppModel) View() string {
 		return m.promptOrchestrator.View()
 	}
 
+	// Handle error state - display the error prominently
+	if m.state == StateError && m.error != nil {
+		var output strings.Builder
+		output.WriteString(m.error.Error())
+		output.WriteString("\n\n")
+
+		// Add footer
+		footer := m.renderFooter()
+		if footer != "" {
+			output.WriteString(footer)
+		}
+
+		return output.String()
+	}
+
 	var output strings.Builder
 
 	// Use npm-style renderer for main progress display
@@ -665,6 +698,12 @@ type ErrorMsg struct {
 	Error error
 }
 
+type ChaosErrorMsg struct {
+	Template  *chaos.ErrorTemplate
+	StepName  string
+	StepIndex int
+}
+
 type ProgressTickMsg struct{}
 
 type StepCheckMsg struct{}
@@ -709,8 +748,31 @@ func (m *AppModel) nextStep() tea.Cmd {
 			return StepCheckMsg{}
 		}
 
+		// Don't continue if we're in an error state
+		if m.state == StateError {
+			return StepCheckMsg{}
+		}
+
 		// Check if current step should advance
 		if m.tracker.IsStepReady() {
+			// Check for chaos injection if chaos tracker is available
+			if m.chaosTracker != nil {
+				// Execute step with chaos checking
+				result := m.chaosTracker.ExecuteStep(m.tracker.CurrentStep())
+
+				// If chaos was injected and failed, display error
+				if result.ChaosInjected && !result.Success {
+					errorTemplate := m.chaosTracker.GenerateErrorTemplate(m.tracker.CurrentStep(), result)
+					if errorTemplate != nil {
+						return ChaosErrorMsg{
+							Template: errorTemplate,
+							StepName: result.StepName,
+							StepIndex: result.StepIndex,
+						}
+					}
+				}
+			}
+
 			// Advance to next step
 			if !m.tracker.NextStep() {
 				// All steps complete
@@ -791,6 +853,11 @@ func (m *AppModel) updateComponentsFromConfig() {
 	m.tracker = progresssim.NewCreateTracker(devOnly)
 	m.totalSteps = m.tracker.TotalSteps()
 
+	// If chaos tracker exists, wrap the new tracker
+	if m.chaosTracker != nil {
+		m.chaosTracker = chaos.NewChaosAwareTracker(m.tracker, m.chaosTracker.GetChaosInjector())
+	}
+
 	// Create new renderer with user configuration
 	appName := m.target
 	targetDir := fmt.Sprintf("./%s", m.target)
@@ -800,4 +867,17 @@ func (m *AppModel) updateComponentsFromConfig() {
 	// Update AAR generator with proper user configuration
 	projectPath := fmt.Sprintf("./%s", m.target)
 	m.aarGenerator = aar.NewAARGenerator(m.tracker, m.userConfig, m.startTime, projectPath)
+}
+
+// NewAppModelWithChaos creates a new app model with chaos injection capabilities
+func NewAppModelWithChaos(command, target string, flags []string, userConfig *config.UserConfiguration, verbosityConfig *config.VerbosityConfig, chaosInjector chaos.ChaosInjector) *AppModel {
+	// Start with the basic model
+	model := NewAppModelWithVerbosity(command, target, flags, userConfig, verbosityConfig)
+
+	// Add chaos functionality if injector provided
+	if chaosInjector != nil {
+		model.chaosTracker = chaos.NewChaosAwareTracker(model.tracker, chaosInjector)
+	}
+
+	return model
 }
