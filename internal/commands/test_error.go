@@ -105,6 +105,11 @@ Examples:
 	cmd.Flags().StringVar(&severity, "severity", "critical", "Error severity level (info, warning, critical, fatal)")
 	cmd.Flags().BoolVar(&chaosMode, "chaos", true, "Generate chaos marine error (false for real system error)")
 
+	// Add hidden test flag for guaranteed chaos injection
+	var testGuaranteedChaos bool
+	cmd.Flags().BoolVar(&testGuaranteedChaos, "test-guaranteed-chaos", false, "Test TUI with guaranteed chaos injection (hidden)")
+	cmd.Flags().MarkHidden("test-guaranteed-chaos")
+
 	return cmd
 }
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 )
@@ -13,6 +14,7 @@ type ChaosInjector interface {
 	// Configuration
 	LoadConfig(config *ChaosConfig) error
 	IsEnabled() bool
+	GetConfig() *ChaosConfig
 	GetAggressivenessLevel() AggressivenessLevel
 
 	// Injection decisions
@@ -198,6 +200,12 @@ func (injector *SafeChaosInjector) IsEnabled() bool {
 }
 
 // GetAggressivenessLevel returns the current aggressiveness level
+func (injector *SafeChaosInjector) GetConfig() *ChaosConfig {
+	injector.mutex.RLock()
+	defer injector.mutex.RUnlock()
+	return injector.config
+}
+
 func (injector *SafeChaosInjector) GetAggressivenessLevel() AggressivenessLevel {
 	injector.mutex.RLock()
 	defer injector.mutex.RUnlock()
@@ -222,6 +230,11 @@ func (injector *SafeChaosInjector) ShouldInject(operation string) bool {
 	// Check operation is allowed
 	if !injector.config.IsOperationAllowed(operation) {
 		return false
+	}
+
+	// TESTING: Check for guaranteed chaos injection via environment variable
+	if os.Getenv("CHAOS_MARINE_FORCE_INJECTION") == "true" {
+		return true
 	}
 
 	// Get base failure rate
