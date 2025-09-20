@@ -353,6 +353,10 @@ Focus: Terminal UI/UX patterns, not actual application scaffolding.`,
 		Use:   "templates",
 		Short: "React template discovery and selection",
 		Long:  "Browse, search, and explore React application templates for CLI ergonomics simulation",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Default to list when no subcommand is provided
+			return runTemplatesList(registry, deps)
+		},
 	}
 
 	templatesListCmd := &cobra.Command{
