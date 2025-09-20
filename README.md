@@ -1,27 +1,40 @@
 # ENGX Ergonomics POC
 
-> **Terminal-based simulation of React web application creation**
+> **Terminal-based simulation of engineering productivity tools and workflows**
 > Focus: Human-computer interaction patterns, TUI design, and command structure
 
 ## Overview
 
-ENGX POC is a proof-of-concept terminal application that **simulates** the creation of React-based web applications. The primary goal is to demonstrate and test terminal UX patterns, CLI ergonomics, and human-computer interaction flows that could be used in real development tooling.
+ENGX POC is a proof-of-concept terminal application that **simulates** engineering productivity tools and workflows. The primary goal is to demonstrate and test terminal UX patterns, CLI ergonomics, and human-computer interaction flows that could be used in real development tooling.
 
-**Key Point**: This is a simulation tool, not actual application scaffolding. It focuses on CLI interaction patterns and terminal user experience rather than generating real React projects.
+**Key Point**: This is a simulation tool, not actual functionality implementation. It focuses on CLI interaction patterns and terminal user experience rather than generating real applications or executing real operations.
+
+### Mission Scope Evolution
+
+**Original Focus**: React application creation simulation
+**Expanded Scope**: Comprehensive engineering productivity tool simulation including:
+
+- **Application Archetypes**: React Apps, CLI tools, headless APIs/services, etc.
+- **Asset Management**: Ownership determination via external 'crews' services
+- **Workflow Management**: Approval/rejection flows, ownership transfers, exception handling
+- **Environment Operations**: Production deployment status, environment management
+- **Template Systems**: Extensible archetype and template discovery patterns
+
+React application creation remains a **core use case** demonstrating the interaction patterns, with the plugin architecture enabling simulation of broader engineering tool categories.
 
 ## Architecture
 
 ### Core Systems
 
 1. **Create Command** (`plugins/create/`)
-   - Interactive React project creation simulation
+   - Interactive project creation simulation (React apps as primary example)
    - TUI-based prompts and configuration
    - Multi-step progress visualization
    - After Action Reports (AAR) for workflow analysis
 
 2. **Template Discovery** (`pkg/common/templates*.go`)
-   - Lightweight React template browsing system
-   - Search and filtering capabilities
+   - Lightweight template/archetype browsing system
+   - Search and filtering capabilities extensible to multiple domains
    - Ergonomic CLI patterns for template selection
    - **Completely modular and removable**
 
@@ -45,9 +58,9 @@ ENGX POC is a proof-of-concept terminal application that **simulates** the creat
 
 ## Available Commands
 
-### Core Application Creation
+### Core Archetype Creation
 ```bash
-# Interactive project creation with TUI
+# Interactive project creation with TUI (React apps as primary example)
 ./dist/engx create MyApp
 
 # Development-only mode (faster, no deployment simulation)
@@ -57,9 +70,9 @@ ENGX POC is a proof-of-concept terminal application that **simulates** the creat
 ./dist/engx create MyApp --template react-typescript-vite
 ```
 
-### Template Discovery
+### Template/Archetype Discovery
 ```bash
-# Browse all available React templates
+# Browse all available templates (React as primary example)
 ./dist/engx templates list
 
 # Search templates by criteria
@@ -76,6 +89,25 @@ ENGX POC is a proof-of-concept terminal application that **simulates** the creat
 
 # View template statistics
 ./dist/engx templates stats
+```
+
+### Future Engineering Productivity Simulations
+```bash
+# Asset ownership management (future)
+# ./dist/engx ownership check my-service
+# ./dist/engx ownership transfer my-service new-team
+
+# Workflow approval processes (future)
+# ./dist/engx approval request exception-approval
+# ./dist/engx approval review pending-requests
+
+# Environment operations (future)
+# ./dist/engx deploy status production
+# ./dist/engx deploy logs staging my-service
+
+# Additional archetypes (future)
+# ./dist/engx archetype api my-new-service
+# ./dist/engx archetype cli my-cli-tool
 ```
 
 ### Analytics & Usage Patterns
@@ -216,22 +248,23 @@ engx-ergonomics-poc/
 
 ## Success Metrics
 
-✅ **Template Discovery**: Natural, intuitive template selection workflows
-✅ **CLI Consistency**: Unified styling and interaction patterns
+✅ **Template/Archetype Discovery**: Natural, intuitive selection workflows extensible to multiple domains
+✅ **CLI Consistency**: Unified styling and interaction patterns across engineering productivity simulations
 ✅ **Analytics Foundation**: Comprehensive usage tracking and pattern detection
-✅ **Modular Architecture**: Easy to modify, extend, or remove components
+✅ **Modular Plugin Architecture**: Easy to extend for diverse engineering tool categories
 ✅ **Professional Polish**: Terminal interface that feels modern and responsive
+✅ **Workflow Simulation Patterns**: Interaction models applicable to ownership, approval, deployment workflows
 
 ## Future Considerations
 
-- Interactive template selection TUI
+- Additional engineering productivity command categories (ownership, approval, deployment)
+- Interactive template/archetype selection TUI
+- Multi-domain archetype support (API, CLI, services beyond React apps)
 - Advanced workflow recording and playback
-- Performance metrics and optimization
-- Multi-language template support
-- Enhanced analytics visualization
+- Enhanced analytics visualization for different tool categories
 
 ---
 
-**Purpose**: Reference implementation for terminal-based React development tooling
+**Purpose**: Reference implementation for terminal-based engineering productivity tooling
 **Status**: Phase 3 Complete - Template discovery and analytics systems integrated
-**Next**: Visual consistency improvements and enhanced interaction patterns
+**Next**: Expand simulation scope with additional engineering productivity command categories

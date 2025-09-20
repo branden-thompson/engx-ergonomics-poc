@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
 )
 
 // OutputFormatter interface for different AAR output formats
@@ -47,11 +48,14 @@ func (f *StandardFormatter) Format(summary *AARSummary) string {
 	isDevOnly := summary.ProjectInfo.DevOnly
 	setupType := "PRODUCTION READY"
 	setupNote := ""
+	cmdFormatter := components.NewCommandFormatter()
 	if isDevOnly {
 		setupType = "DEV ONLY"
-		setupNote = fmt.Sprintf("   └ run `engx promote %s --production` if you need to \n      deploy this application to a production environment.", summary.ProjectInfo.Name)
+		promoteCmd := cmdFormatter.FormatCommandInBackticks(fmt.Sprintf("engx promote %s --production", summary.ProjectInfo.Name))
+		setupNote = fmt.Sprintf("   └ run %s if you need to \n      deploy this application to a production environment.", promoteCmd)
 	} else {
-		setupNote = fmt.Sprintf("   └ run `engx deploy %s --production` when ready to \n      deploy this application to a production environment.", summary.ProjectInfo.Name)
+		deployCmd := cmdFormatter.FormatCommandInBackticks(fmt.Sprintf("engx deploy %s --production", summary.ProjectInfo.Name))
+		setupNote = fmt.Sprintf("   └ run %s when ready to \n      deploy this application to a production environment.", deployCmd)
 	}
 
 	// Get dev server command and port
@@ -93,30 +97,6 @@ func (f *StandardFormatter) Format(summary *AARSummary) string {
 		colorBrightMagenta = "\033[95m"  // Bright magenta for terminal commands
 	)
 
-	// formatCommandsInBackticks applies magenta color to text wrapped in backticks
-	// while preserving the surrounding color context
-	formatCommandsInBackticks := func(text string) string {
-		// Replace `command` with colored version, returning to grey after
-		result := text
-		for {
-			start := strings.Index(result, "`")
-			if start == -1 {
-				break
-			}
-			end := strings.Index(result[start+1:], "`")
-			if end == -1 {
-				break
-			}
-			end = start + 1 + end
-
-			// Extract command without backticks
-			command := result[start+1:end]
-			// Replace with colored version that returns to grey
-			coloredCommand := fmt.Sprintf("%s%s%s%s", colorBrightMagenta, command, colorReset, colorLightGrey)
-			result = result[:start] + coloredCommand + result[end+1:]
-		}
-		return result
-	}
 
 	// Build the AAR with exact spacing AND COLORS
 	output.WriteString("\n")
@@ -150,9 +130,7 @@ func (f *StandardFormatter) Format(summary *AARSummary) string {
 		colorWhite, colorReset, setupTypeColored))
 
 	if setupNote != "" {
-		// Apply magenta formatting to commands in backticks
-		formattedSetupNote := formatCommandsInBackticks(setupNote)
-		output.WriteString(fmt.Sprintf("%s%s%s\n", colorLightGrey, formattedSetupNote, colorReset))
+		output.WriteString(fmt.Sprintf("%s%s%s\n", colorLightGrey, setupNote, colorReset))
 	}
 
 	// Local server info section with colors

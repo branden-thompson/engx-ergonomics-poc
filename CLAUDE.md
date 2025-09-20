@@ -4,14 +4,25 @@
 ## PROJECT CLASSIFICATION
 - **Type**: LEVEL-1 SEV-0 POC
 - **Name**: engx-ergonomics-poc
-- **Focus**: Terminal-based simulation of React web application creation
+- **Focus**: Terminal-based simulation of engineering productivity tools and workflows
 - **Status**: PHASE 3 COMPLETE - Advanced Features Implemented
 
 ## BRTOPS FRAMEWORK ACTIVE
 **CRITICAL**: This project operates under BRTOPS protocols with SEV-0 quality requirements.
 
 ### CORE MISSION
-Create a proof-of-concept terminal application that SIMULATES the creation of a React-based web application project. Focus on human-computer interaction patterns, TUI design, and command structure - NOT actual application generation.
+Create a proof-of-concept terminal application that SIMULATES engineering productivity tools and workflows. Focus on human-computer interaction patterns, TUI design, and command structure - NOT actual functionality implementation.
+
+#### MISSION SCOPE EVOLUTION
+**Original Focus**: React application creation simulation
+**Expanded Scope**: Comprehensive engineering productivity tool simulation including:
+- **Application Archetypes**: React Apps, CLI tools, headless APIs/services, etc.
+- **Asset Management**: Ownership determination via external 'crews' services
+- **Workflow Management**: Approval/rejection flows, ownership transfers, exception handling
+- **Environment Operations**: Production deployment status, environment management
+- **Template Systems**: Extensible archetype and template discovery patterns
+
+React application creation remains a **core use case** demonstrating the interaction patterns, with the plugin architecture enabling simulation of broader engineering tool categories.
 
 ### CURRENT IMPLEMENTATION STATUS
 
@@ -25,7 +36,8 @@ Create a proof-of-concept terminal application that SIMULATES the creation of a 
 - **Analytics Framework**: CLI interaction tracking and pattern detection (`engx analytics`)
 - **Professional Styling**: Consistent lipgloss-based terminal aesthetics
 - **Modular Architecture**: Template system is completely removable as requested
-- **Workflow Simulation**: Realistic React development tool interaction patterns
+- **Workflow Simulation**: Realistic engineering productivity tool interaction patterns
+- **Plugin Architecture**: Extensible foundation for diverse engineering tool simulations
 
 ### ARCHITECTURE OVERVIEW
 
@@ -37,10 +49,10 @@ Create a proof-of-concept terminal application that SIMULATES the creation of a 
 
 #### Command Structure
 ```bash
-# Core application creation
+# Core archetype creation (React apps as primary example)
 engx create MyApp [--dev-only] [--template <id>]
 
-# Template discovery (Phase 3)
+# Template/Archetype discovery (Phase 3)
 engx templates {list|search|info|recommended|complexity|stats}
 
 # Analytics & insights (Phase 3)
@@ -48,6 +60,12 @@ engx analytics {status|summary|details|patterns|stats|export}
 
 # Development tools
 engx dev {plugin|config|hotreload|generate}
+
+# Future engineering productivity simulations:
+# engx ownership {check|transfer|crews} <asset>
+# engx approval {request|review|approve|reject} <workflow>
+# engx deploy {status|logs|health} <environment>
+# engx archetype {api|cli|service|webapp} <name>
 ```
 
 ### KEY REQUIREMENTS ✅
@@ -94,13 +112,14 @@ engx dev {plugin|config|hotreload|generate}
 
 ### REFERENCE VALUE
 This POC successfully demonstrates:
-- **CLI Ergonomics**: Natural command discovery and interaction patterns
-- **Template Selection UX**: Intuitive React template browsing workflows
+- **CLI Ergonomics**: Natural command discovery and interaction patterns for engineering tools
+- **Template/Archetype Selection UX**: Intuitive browsing workflows extensible to multiple domains
 - **Terminal Aesthetics**: Professional styling with lipgloss framework
 - **Analytics Foundation**: Usage tracking for data-driven UX improvements
-- **Modular Design**: Easy to extend, modify, or remove components
+- **Modular Plugin Architecture**: Easy to extend for diverse engineering productivity simulations
+- **Workflow Simulation Patterns**: Interaction models applicable to ownership, approval, deployment workflows
 
 ---
 **BRTOPS Version**: 1.1.001
 **Project Status**: PHASE 3 COMPLETE - Ready for Production Reference Use
-**Next Phase**: Optional enhancements (interactive TUI selectors, advanced analytics)
+**Next Phase**: Expand simulation scope with additional engineering productivity command categories

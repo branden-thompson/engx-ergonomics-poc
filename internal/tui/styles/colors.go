@@ -3,6 +3,17 @@ package styles
 import "github.com/charmbracelet/lipgloss"
 
 // Color palette for DPX Web theme
+//
+// STYLING CONSISTENCY RULES (based on create command AAR):
+// 1. Dividers/separators: DarkGray (ANSI 90)
+// 2. Main section headers: BrightWhite (ANSI 97) - NOT BOLD
+// 3. Backticked commands: BrightMagenta (ANSI 95)
+// 4. Table headers: LightPurple - NOT BOLD
+// 5. Main content labels: BrightWhite (ANSI 97)
+// 6. Secondary content: Gray500 (lighter gray)
+// 7. Numbers/indexes: DarkGray (ANSI 90)
+// 8. Success indicators: Success green
+// 9. Special highlights: Primary colors
 var (
 	// Primary colors
 	Primary   = lipgloss.Color("#06B6D4") // Cyan-500
@@ -29,6 +40,13 @@ var (
 	Muted     = Gray500
 	Border    = Gray300
 	Background = Gray100
+
+	// Terminal ANSI colors (matching create command styling exactly)
+	ANSI_BrightWhite   = lipgloss.Color("97")  // ^[[97m - bright white
+	ANSI_BrightMagenta = lipgloss.Color("95")  // ^[[95m - bright magenta
+	ANSI_DarkGray      = lipgloss.Color("90")  // ^[[90m - dark gray
+	ANSI_BrightGreen   = lipgloss.Color("92")  // ^[[92m - bright green
+	ANSI_Orange        = lipgloss.Color("208") // ^[[38;5;208m - orange
 )
 
 // Common style presets

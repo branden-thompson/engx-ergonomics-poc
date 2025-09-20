@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bthompso/engx-ergonomics-poc/pkg/common/interfaces"
+	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
 )
 
 // AnalyticsUI provides CLI interface for interaction analytics
@@ -61,8 +62,9 @@ func (aui *AnalyticsUI) ShowSessionSummary() error {
 		}
 	}
 
-	fmt.Printf("\n💡 Use 'engx analytics details' for comprehensive analysis\n")
-	fmt.Printf("💡 Use 'engx analytics export' to save data for review\n")
+	cmdFormatter := components.NewCommandFormatter()
+	fmt.Printf("\n💡 Use %s for comprehensive analysis\n", cmdFormatter.FormatCommandInBackticks("engx analytics details"))
+	fmt.Printf("💡 Use %s to save data for review\n", cmdFormatter.FormatCommandInBackticks("engx analytics export"))
 
 	return nil
 }
@@ -156,7 +158,8 @@ func (aui *AnalyticsUI) ShowDetailedAnalytics() error {
 		}
 	}
 
-	fmt.Printf("\n💡 Use 'engx analytics export' to save this data\n")
+	cmdFormatter := components.NewCommandFormatter()
+	fmt.Printf("\n💡 Use %s to save this data\n", cmdFormatter.FormatCommandInBackticks("engx analytics export"))
 
 	return nil
 }
@@ -193,7 +196,8 @@ func (aui *AnalyticsUI) ShowWorkflowPatterns() error {
 	}
 
 	fmt.Printf("\n💡 Patterns help identify common developer workflows\n")
-	fmt.Printf("💡 Use 'engx analytics details' for complete analysis\n")
+	cmdFormatter := components.NewCommandFormatter()
+	fmt.Printf("💡 Use %s for complete analysis\n", cmdFormatter.FormatCommandInBackticks("engx analytics details"))
 
 	return nil
 }
@@ -262,7 +266,8 @@ func (aui *AnalyticsUI) ShowUsageStats() error {
 		fmt.Println()
 	}
 
-	fmt.Printf("\n💡 Use 'engx analytics patterns' to see workflow analysis\n")
+	cmdFormatter := components.NewCommandFormatter()
+	fmt.Printf("\n💡 Use %s to see workflow analysis\n", cmdFormatter.FormatCommandInBackticks("engx analytics patterns"))
 
 	return nil
 }
@@ -322,8 +327,9 @@ func (aui *AnalyticsUI) ShowAnalyticsStatus() error {
 	patterns := aui.analytics.GetWorkflowPatterns()
 	fmt.Printf("Patterns Detected: %d\n", len(patterns))
 
-	fmt.Printf("\n💡 Use 'engx analytics summary' for session overview\n")
-	fmt.Printf("💡 Use 'engx analytics details' for full analysis\n")
+	cmdFormatter := components.NewCommandFormatter()
+	fmt.Printf("\n💡 Use %s for session overview\n", cmdFormatter.FormatCommandInBackticks("engx analytics summary"))
+	fmt.Printf("💡 Use %s for full analysis\n", cmdFormatter.FormatCommandInBackticks("engx analytics details"))
 
 	return nil
 }

@@ -268,7 +268,7 @@ func (e *NextStepsEngine) initializeDefaultRules() {
 				{
 					Action:      "Retry Project Creation",
 					Description: "After addressing issues, try creating the project again",
-					Command:     "engx create %s",
+					Command:     "engx create <%s>",
 					Priority:    PriorityHigh,
 					Category:    CategoryTroubleshooting,
 				},

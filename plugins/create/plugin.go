@@ -71,12 +71,12 @@ This command simulates the creation of a new React application with:
 - Deployment preparation (unless --dev-only)
 
 Examples:
-  engx create MyApp
-  engx create MyApp --dev-only
-  engx create MyApp --template=typescript
-  engx create MyApp --verbose
-  engx create MyApp --chaos-marine --chaos-level=scout
-  engx create MyApp --chaos-marine --chaos-level=aggressive --chaos-seed=12345`,
+  engx create <MyApp>
+  engx create <MyApp> --dev-only
+  engx create <MyApp> --template=typescript
+  engx create <MyApp> --verbose
+  engx create <MyApp> --chaos-marine --chaos-level=scout
+  engx create <MyApp> --chaos-marine --chaos-level=aggressive --chaos-seed=12345`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return p.executeCommand(cmd, args, dependencies, devOnly, template, chaosMarine, chaosLevel, chaosSeed, chaosConfig)
