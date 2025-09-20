@@ -2,7 +2,6 @@ package example_advanced
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/bthompso/engx-ergonomics-poc/pkg/common"
 	"github.com/bthompso/engx-ergonomics-poc/pkg/common/interfaces"

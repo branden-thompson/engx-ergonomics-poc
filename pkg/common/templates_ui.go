@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
+	"github.com/bthompso/engx-ergonomics-poc/internal/tui/design"
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/styles"
 )
 
@@ -21,125 +23,119 @@ func NewTemplateUI() *TemplateUI {
 	}
 }
 
-// ShowTemplateList displays all available React templates with professional styling
+// ShowTemplateList displays all available application archetypes with professional styling
 func (tui *TemplateUI) ShowTemplateList() error {
 	templates := tui.manager.ListTemplates()
 
-	// Header with styled title
-	headerStyle := lipgloss.NewStyle().
-		Foreground(styles.Primary).
-		Bold(true).
-		MarginBottom(1)
-
-	fmt.Print(headerStyle.Render("🚀 React Templates"))
-	fmt.Println()
-
-	dividerStyle := lipgloss.NewStyle().
-		Foreground(styles.Gray400)
-	fmt.Print(dividerStyle.Render(strings.Repeat("─", 70)))
-	fmt.Println()
-
 	if len(templates) == 0 {
-		errorStyle := lipgloss.NewStyle().
-			Foreground(styles.Warning).
-			MarginTop(1)
-		fmt.Print(errorStyle.Render("No templates available."))
-		fmt.Println()
+		fmt.Print(components.Warning("No archetypes available.\n"))
 		return nil
 	}
 
-	// Show recommended templates first
-	recommended := tui.manager.GetRecommended()
-	if len(recommended) > 0 {
-		sectionStyle := lipgloss.NewStyle().
-			Foreground(styles.Success).
-			Bold(true).
-			MarginTop(1).
-			MarginBottom(1)
-		fmt.Print(sectionStyle.Render("\n⭐ Recommended for new projects:"))
-		fmt.Println()
+	// APPLICATION ARCHETYPES header using new header component
+	header := components.NewHeader("APPLICATION ARCHETYPES")
+	fmt.Print(header.Render())
 
-		for i, template := range recommended {
-			tui.displayTemplateCompactStyled(i+1, template)
+	// Create flexible archetype table for terminal width awareness
+	formatter := components.NewFlexibleArchetypeTable()
+
+	// Archetype data
+	archetypes := []struct {
+		num        string
+		name       string
+		framework  string
+		language   string
+		appType    string
+		isDefault  bool
+	}{
+		{"01.", "PROD Web App", "React Router 7", "TypeScript", "'prod-web'", true},
+		{"02.", "DEV ONLY Web App", "React Router 7", "TypeScript", "'dev-web'", false},
+		{"03.", "Hackathon Web App", "React Router 7", "TypeScript", "'hackday'", false},
+		{"04.", "`engx` command", "Bubble", "GOLANG", "'engx-cmd'", false},
+		{"05.", "Standalone CLI", "Bubble", "GOLANG", "'cli'", false},
+		{"06.", "Headless Service", "Bubble", "GOLANG", "'service'", false},
+		{"07.", "Agent / Sub-Agent", "Variable", "Python", "'agent'", false},
+	}
+
+	// Prepare data for width calculation
+	data := make([][]string, len(archetypes))
+	for i, archetype := range archetypes {
+		data[i] = []string{
+			archetype.num,
+			archetype.name,
+			archetype.framework,
+			archetype.language,
+			archetype.appType,
 		}
 	}
 
-	// Show popular templates
-	popular := tui.manager.GetPopular()
-	if len(popular) > 0 {
-		sectionStyle := lipgloss.NewStyle().
-			Foreground(styles.Warning).
-			Bold(true).
-			MarginTop(1).
-			MarginBottom(1)
-		fmt.Print(sectionStyle.Render("\n🔥 Popular choices:"))
-		fmt.Println()
+	// Calculate flexible widths, reserving space for the (Default) badge
+	badgeWidth := 11 // "  (Default)" badge width
+	columnWidths := formatter.CalculateFlexibleWidths(data, badgeWidth)
 
-		popularCount := 0
-		for _, template := range popular {
-			if !template.Recommended { // Don't duplicate recommended ones
-				popularCount++
-				tui.displayTemplateCompactStyled(popularCount, template)
-			}
+	// Print header with calculated widths
+	fmt.Printf("%s\n", formatter.FormatHeaderWithWidths(columnWidths))
+
+	// Print data rows using design system colors and calculated widths
+	for _, archetype := range archetypes {
+		values := []string{
+			archetype.num,
+			archetype.name,
+			archetype.framework,
+			archetype.language,
+			archetype.appType,
 		}
+
+		colors := []string{
+			design.ColorDarkGray,    // num
+			design.ColorBrightWhite, // name
+			design.ColorDarkGray,    // framework
+			design.ColorDarkGray,    // language
+			design.ColorBrightBlue,  // apptype (option values use light blue)
+		}
+
+		rowText := formatter.FormatRowWithWidths(values, colors, columnWidths)
+
+		// Add default indicator using badge component
+		if archetype.isDefault {
+			badge := components.NewBadge("  (Default)").AsSuccess()
+			rowText += badge.Render()
+		}
+
+		fmt.Printf("%s\n", rowText)
 	}
 
-	// Show all templates in a styled table
-	tableHeaderStyle := lipgloss.NewStyle().
-		Foreground(styles.Secondary).
-		Bold(true).
-		MarginTop(1).
-		MarginBottom(1)
-	fmt.Print(tableHeaderStyle.Render("\n📋 All Templates:"))
-	fmt.Println()
+	// Separator using new component
+	separator := components.NewSeparator()
+	fmt.Print("\n" + separator.Render() + "\n")
 
-	// Table header with styling
-	headerRowStyle := lipgloss.NewStyle().
-		Foreground(styles.Gray600).
-		Bold(true)
+	// Commands section header
+	commandHeader := components.NewHeader("Common Commands and Usage")
+	fmt.Print(commandHeader.Render())
 
-	fmt.Print(headerRowStyle.Render(fmt.Sprintf("%-3s %-25s %-15s %-12s %-10s %-8s",
-		"#", "NAME", "FRAMEWORK", "LANGUAGE", "COMPLEXITY", "SETUP")))
-	fmt.Println()
+	// Command examples using smart command formatter
+	commandFormatter := components.NewCommandTable()
+	cmdFormatterSmart := components.NewCommandFormatter()
 
-	fmt.Print(dividerStyle.Render(strings.Repeat("─", 70)))
-	fmt.Println()
-
-	// Table rows with alternating styling
-	for i, template := range templates {
-		complexity := template.Complexity.String()
-		if len(complexity) > 10 {
-			complexity = complexity[:10]
-		}
-
-		rowStyle := lipgloss.NewStyle().
-			Foreground(styles.Gray700)
-		if i%2 == 1 {
-			rowStyle = rowStyle.Foreground(styles.Gray600)
-		}
-
-		fmt.Print(rowStyle.Render(fmt.Sprintf("%-3d %-25s %-15s %-12s %-10s %-8s",
-			i+1,
-			truncateString(template.Name, 25),
-			template.Framework,
-			template.Language,
-			complexity,
-			template.SetupTime)))
-		fmt.Println()
+	commands := []struct {
+		command string
+		desc    string
+	}{
+		{"engx create <AppName> --app-type <app-type>", "Use Archetype for new App"},
+		{"engx templates details <app-type>", "Get Archetype"},
+		{"engx templates search <query>", "Find specific templates"},
 	}
 
-	// Footer with helpful tips
-	tipStyle := lipgloss.NewStyle().
-		Foreground(styles.Info).
-		MarginTop(1)
+	for _, cmd := range commands {
+		// Use smart formatter for the command, regular formatting for description
+		formattedCmd := cmdFormatterSmart.FormatCommandInBackticks(cmd.command)
+		row := []string{formattedCmd, cmd.desc}
+		colors := []string{"", design.ColorDarkGray} // Command already formatted, just color the description
+		fmt.Printf("%s\n", commandFormatter.FormatRow(row, colors))
+	}
 
-	fmt.Println()
-	fmt.Print(tipStyle.Render("💡 Use 'engx templates info <template-id>' for details"))
-	fmt.Println()
-	fmt.Print(tipStyle.Render("💡 Use 'engx templates search <query>' to find specific templates"))
-	fmt.Println()
-	fmt.Print(tipStyle.Render("💡 Use 'engx create MyApp --template <template-id>' to use a template"))
-	fmt.Println()
+	// Final separator
+	fmt.Print("\n" + separator.Render())
 
 	return nil
 }
@@ -225,7 +221,7 @@ func (tui *TemplateUI) ShowRecommended() error {
 		return nil
 	}
 
-	fmt.Println("Perfect for new React projects:\n")
+	fmt.Print("Perfect for new React projects:\n\n")
 
 	for i, template := range recommended {
 		fmt.Printf("%d. %s\n", i+1, template.Name)
