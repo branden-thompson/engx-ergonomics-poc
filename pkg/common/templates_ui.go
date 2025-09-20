@@ -515,7 +515,7 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 			features:    []string{"TypeScript", "React Router 7", "Tailwind CSS", "Radix UI", "ShadCN-based UI Design System (SUDS)"},
 			useCase:     "Default archetype for new internal tool applications",
 			setupTime:   "8-12 minutes",
-			includes:    []string{"TrustBridge SSO", "gRPC Web", "CREWS API", "CATALOG API", "GRID/HDFS Access", "GitHub Actions", "ESLint + Prettier", "Vitest Testing", "Storybook", "GitHub Pages", "Microsoft Clarity", "LIX Integration", "Observe (Service Monitoring)", "LCD (LinkedIn Continuous Deployment)", "Docker Ready", "Azure Cloud"},
+			includes:    []string{"TrustBridge SSO", "gRPC Web", "CREWS API", "CATALOG API", "GRID/HDFS Access", "GitHub Actions", "ESLint + Prettier", "Vitest Testing", "Storybook", "GitHub Pages", "Microsoft Clarity", "LIX Integration", "Observe (Service Monitoring)", "LCD (LinkedIn Continuous Deployment)", "Docker Ready", "Azure Cloud", "MAE (Auto-Migration)", "SUDS MCP", "EngX Agent", "Co-Pilot"},
 		},
 		"dev-web": {
 			name:        "Development Web Application",
@@ -525,7 +525,7 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 			features:    []string{"TypeScript", "React Router 7", "Tailwind CSS", "Radix UI", "ShadCN-based UI Design System (SUDS)"},
 			useCase:     "Quick prototypes and development-focused applications",
 			setupTime:   "3-5 minutes",
-			includes:    []string{"TrustBridge SSO", "gRPC Web", "CREWS API", "CATALOG API", "GRID/HDFS Access", "GitHub Actions", "ESLint + Prettier", "Vitest Testing", "Storybook", "GitHub Pages", "Microsoft Clarity", "LIX Integration", "Observe (Service Monitoring)"},
+			includes:    []string{"TrustBridge SSO", "gRPC Web", "CREWS API", "CATALOG API", "GRID/HDFS Access", "GitHub Actions", "ESLint + Prettier", "Vitest Testing", "Storybook", "GitHub Pages", "Microsoft Clarity", "LIX Integration", "Observe (Service Monitoring)", "MAE (Auto-Migration)", "SUDS MCP", "EngX Agent", "Co-Pilot"},
 		},
 		"hackday": {
 			name:        "Hackathon Web Application",
@@ -535,7 +535,7 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 			features:    []string{"Router", "Minimal Setup", "Fast Build"},
 			useCase:     "24-48 hour hackathons and rapid proof-of-concepts",
 			setupTime:   "1-2 minutes",
-			includes:    []string{"Minimal Dependencies", "Quick Start Scripts", "Pre-configured Styling", "Example Components"},
+			includes:    []string{"Minimal Dependencies", "Quick Start Scripts", "Pre-configured Styling", "Example Components", "MAE (Auto-Migration)", "SUDS MCP", "EngX Agent", "Co-Pilot"},
 		},
 		"engx-cmd": {
 			name:        "ENGX Command Tool",
@@ -545,7 +545,7 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 			features:    []string{"Terminal UI", "Interactive Forms", "Command Structure", "Plugin System"},
 			useCase:     "Command-line tools and terminal-based applications",
 			setupTime:   "5-8 minutes",
-			includes:    []string{"Cobra CLI Framework", "Bubble Tea TUI", "Configuration Management", "Plugin Architecture"},
+			includes:    []string{"Cobra CLI Framework", "Bubble Tea TUI", "Configuration Management", "Plugin Architecture", "MAE (Auto-Migration)", "EngX Agent", "Co-Pilot"},
 		},
 		"cli": {
 			name:        "Standalone CLI Tool",
@@ -555,7 +555,7 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 			features:    []string{"Command Structure", "Flag Parsing", "Config Files"},
 			useCase:     "Utility tools and command-line applications",
 			setupTime:   "3-5 minutes",
-			includes:    []string{"Command Framework", "Configuration", "Help System", "Build Scripts"},
+			includes:    []string{"Command Framework", "Configuration", "Help System", "Build Scripts", "MAE (Auto-Migration)", "EngX Agent", "Co-Pilot"},
 		},
 		"service": {
 			name:        "Headless Service",
@@ -565,7 +565,7 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 			features:    []string{"HTTP API", "Background Processing", "Database Integration"},
 			useCase:     "APIs, microservices, and background processing services",
 			setupTime:   "6-10 minutes",
-			includes:    []string{"Web Framework", "Database Integration", "Logging", "Health Checks", "Docker Support"},
+			includes:    []string{"Web Framework", "Database Integration", "Logging", "Health Checks", "Docker Support", "MAE (Auto-Migration)", "EngX Agent", "Co-Pilot"},
 		},
 		"agent": {
 			name:        "AI Agent / Sub-Agent",
@@ -637,6 +637,7 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 	engxIntegrations := []string{}
 	qualityTesting := []string{}
 	analyticsMonitoring := []string{}
+	agenticCapabilities := []string{}
 	deployment := []string{}
 
 	for _, include := range info.includes {
@@ -651,6 +652,9 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 		case strings.Contains(include, "Clarity") || strings.Contains(include, "LIX") ||
 			 strings.Contains(include, "Observe"):
 			analyticsMonitoring = append(analyticsMonitoring, include)
+		case strings.Contains(include, "MAE") || strings.Contains(include, "SUDS MCP") ||
+			 strings.Contains(include, "EngX Agent") || strings.Contains(include, "Co-Pilot"):
+			agenticCapabilities = append(agenticCapabilities, include)
 		case strings.Contains(include, "LCD") || strings.Contains(include, "Docker") ||
 			 strings.Contains(include, "Azure"):
 			deployment = append(deployment, include)
@@ -675,6 +679,13 @@ func (tui *TemplateUI) ShowArchetypeDetails(appType string) error {
 	if len(analyticsMonitoring) > 0 {
 		content.WriteString("• User Analytics & Testing:\n")
 		content.WriteString(formatBulletItems(analyticsMonitoring, terminalWidth))
+		content.WriteString("\n")
+	}
+
+	// Agentic Capabilities
+	if len(agenticCapabilities) > 0 {
+		content.WriteString("• Agentic Capabilities:\n")
+		content.WriteString(formatBulletItems(agenticCapabilities, terminalWidth))
 		content.WriteString("\n")
 	}
 
