@@ -1,0 +1,29 @@
+# Advanced Command Plugin Configuration Example
+# Copy this file to your project and customize as needed
+
+# Plugin settings
+example_advanced:
+  enabled: true
+  version: "1.0.0"
+
+  # Custom configuration options
+  settings:
+    # Add your plugin-specific settings here
+    debug: false
+    timeout: 30s
+
+  # Command line flag defaults
+  defaults:
+    output: text  # Output format (text, json, yaml)
+    verbose: false  # Enable verbose output
+    
+  
+
+# Dependencies configuration
+dependencies:
+  config: {}
+  logger: {}
+  
+  filesystem: {}
+  tui: {}
+  
