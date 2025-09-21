@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bthompso/engx-ergonomics-poc/internal/config"
+	"golang.org/x/term"
 )
 
 // ANSI escape codes for styling
@@ -45,8 +46,19 @@ func NewInlinePrompter() (*InlinePrompter, error) {
 	}, nil
 }
 
-// RunPrompts executes all applicable prompts based on conditions
+// RunPrompts executes all applicable prompts based on conditions with new styling
 func (ip *InlinePrompter) RunPrompts(devOnly bool, flags []string) (*config.UserConfiguration, error) {
+	return ip.RunPromptsWithContext(devOnly, flags, "", "")
+}
+
+// RunPromptsWithContext executes all applicable prompts with archetype context and styling
+func (ip *InlinePrompter) RunPromptsWithContext(devOnly bool, flags []string, archetypeName string, appName string) (*config.UserConfiguration, error) {
+	// Import components for styling
+	// Note: Will need to import the components package
+
+	// Don't display styled header - remove the configuration header section
+	// Just proceed directly to prompts after archetype selection
+
 	// Initialize user config with defaults
 	ip.userConfig = &config.UserConfiguration{
 		ProjectName: "", // Will be set by caller
@@ -82,14 +94,16 @@ func (ip *InlinePrompter) RunPrompts(devOnly bool, flags []string) (*config.User
 		}
 	}
 
+	// No footer needed - clean prompt flow
+
 	return ip.userConfig, nil
 }
 
 // askPrompt handles a single prompt interaction with enhanced formatting
 func (ip *InlinePrompter) askPrompt(prompt *config.PromptConfig) error {
 	for {
-		// Show the question with Claude Code-style formatting
-		fmt.Printf("? %s ", prompt.Question)
+		// Show the question with single space formatting to align with checkmarks
+		fmt.Printf(" ? %s ", prompt.Question)
 
 		// Read user input
 		input, err := ip.reader.ReadString('\n')
@@ -175,4 +189,14 @@ func (ip *InlinePrompter) applyPromptResult(prompt *config.PromptConfig, input s
 // GetUserConfiguration returns the final user configuration
 func (ip *InlinePrompter) GetUserConfiguration() *config.UserConfiguration {
 	return ip.userConfig
+}
+
+// getTerminalWidth gets the current terminal width for responsive headers
+func getTerminalWidth() int {
+	// Try to get terminal width from stdout
+	if width, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && width > 0 {
+		return width
+	}
+	// Fallback to a reasonable default
+	return 80
 }
