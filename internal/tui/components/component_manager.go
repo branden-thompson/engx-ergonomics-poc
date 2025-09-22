@@ -27,7 +27,55 @@ type ComponentManager struct {
 	phaseProgress    float64
 }
 
-// NewComponentManager creates a new component manager with the default installation plan
+// NewComponentManagerForArchetype creates a new component manager with an installation plan based on actual archetype components
+func NewComponentManagerForArchetype(coreTech, engxInteg, qualityTest, userAnalytics, agentic, deployment []Component) *ComponentManager {
+	plan := []ComponentInstallationStep{}
+
+	// Helper function to add components from a section to a phase
+	addComponentsToPhase := func(components []Component, phase ComponentInstallationPhase, startProgress, endProgress float64) {
+		if len(components) == 0 {
+			return
+		}
+
+		progressStep := (endProgress - startProgress) / float64(len(components))
+		for i, component := range components {
+			start := startProgress + float64(i)*progressStep
+			end := startProgress + float64(i+1)*progressStep
+
+			plan = append(plan, ComponentInstallationStep{
+				Phase:          phase,
+				ProgressStart:  start,
+				ProgressEnd:    end,
+				ComponentNames: []string{component.Name},
+				SuccessRate:    0.95,
+			})
+		}
+	}
+
+	// DEPENDENCIES PHASE: Core Technologies (10%-70%)
+	addComponentsToPhase(coreTech, PhaseDependencies, 0.1, 0.7)
+
+	// Add EngX Integrations to Dependencies phase (70%-90%)
+	addComponentsToPhase(engxInteg, PhaseDependencies, 0.7, 0.9)
+
+	// PROJECT STRUCTURE PHASE: Agentic Capabilities (20%-80%)
+	addComponentsToPhase(agentic, PhaseProjectStructure, 0.2, 0.8)
+
+	// Add Deployment Capabilities to Project Structure phase (80%-100%)
+	addComponentsToPhase(deployment, PhaseProjectStructure, 0.8, 1.0)
+
+	// TESTING FRAMEWORKS PHASE: Quality & Testing (25%-75%) + User Analytics (75%-100%)
+	addComponentsToPhase(qualityTest, PhaseTestingFrameworks, 0.25, 0.75)
+	addComponentsToPhase(userAnalytics, PhaseTestingFrameworks, 0.75, 1.0)
+
+	return &ComponentManager{
+		installationPlan: plan,
+		currentPhase:     PhaseDependencies,
+		phaseProgress:    0.0,
+	}
+}
+
+// NewComponentManager creates a new component manager with the default installation plan (deprecated - use NewComponentManagerForArchetype)
 func NewComponentManager() *ComponentManager {
 	plan := []ComponentInstallationStep{
 		// DEPENDENCIES PHASE: Core Technologies (10%-60%) + EngX Start (70%-80%)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bthompso/engx-ergonomics-poc/internal/tui/components"
 	"golang.org/x/term"
@@ -108,59 +109,14 @@ func (as *ArchetypeSelectionStage) showSelectionUI(archetypes []*ArchetypeDefini
 	// Print header with calculated widths - add selection column header
 	fmt.Printf("%s\n", formatter.FormatHeaderWithWidths(columnWidths))
 
-	// Print each archetype as a numbered row using calculated widths
-	for i, archetype := range orderedArchetypes {
-		selectionCol := "  " // Empty for now, will be used for interactive selection
-		number := fmt.Sprintf("%02d.", i+1)
-
-		// Map archetype to display values
-		framework := as.getFrameworkDisplay(archetype)
-		language := as.getLanguageDisplay(archetype)
-		appType := fmt.Sprintf("'%s'", archetype.ID)
-
-		// Format the row using calculated widths (same pattern as templates view)
-		values := []string{selectionCol, number, archetype.Name, framework, language, appType}
-		colors := []string{"90", "90", "97", "90", "90", "94"} // Added color for selection column
-		rowText := formatter.FormatRowWithWidths(values, colors, columnWidths)
-
-		// Removed default indicator to prevent line wrapping
-		fmt.Println(rowText)
+	// Try interactive mode first, fallback to simple mode if needed
+	selected, err := as.interactiveSelection(orderedArchetypes, formatter, columnWidths)
+	if err != nil {
+		// Fallback to simple selection mode
+		return as.fallbackSelection(orderedArchetypes, formatter, columnWidths)
 	}
 
-	// Width-aware separator
-	width := getTerminalWidthForSelector()
-	separator := strings.Repeat("-", width)
-	fmt.Printf("\n\033[90m%s\033[0m\n\n", separator)
-
-	// Interactive selection loop
-	for {
-		fmt.Print("? Select an archetype (1-" + strconv.Itoa(len(orderedArchetypes)) + "): ")
-
-		input, err := as.reader.ReadString('\n')
-		if err != nil {
-			return nil, fmt.Errorf("failed to read selection: %w", err)
-		}
-
-		choice := strings.TrimSpace(input)
-		if choice == "" {
-			continue
-		}
-
-		// Parse the selection
-		selectedIndex, err := strconv.Atoi(choice)
-		if err != nil || selectedIndex < 1 || selectedIndex > len(orderedArchetypes) {
-			fmt.Printf("\033[91mInvalid selection. Please enter a number between 1 and %d.\033[0m\n", len(orderedArchetypes))
-			continue
-		}
-
-		// Get the selected archetype
-		selected := orderedArchetypes[selectedIndex-1]
-
-		// Display selection confirmation with new styling
-		fmt.Printf("\n\033[92m[✓] %s\033[0m\n", selected.Name)
-
-		return selected, nil
-	}
+	return selected, nil
 }
 
 // reorderArchetypes reorders archetypes to match the templates view
@@ -263,6 +219,297 @@ func (as *ArchetypeSelectionStage) PromptForAppName() (string, error) {
 	}
 
 	return appName, nil
+}
+
+// interactiveSelection implements the full interactive archetype selection with arrow keys
+func (as *ArchetypeSelectionStage) interactiveSelection(archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int) (*ArchetypeDefinition, error) {
+	// Temporarily disable interactive mode to ensure clean table rendering
+	// TODO: Re-implement interactive features once table formatting is stable
+	return nil, fmt.Errorf("interactive mode disabled, using fallback")
+}
+
+// handleNumberInput processes debounced number input
+func (as *ArchetypeSelectionStage) handleNumberInput(currentIndex *int, numberBuffer *string, lastInputTime *time.Time, maxIndex int) {
+	time.Sleep(200 * time.Millisecond) // Debounce delay
+
+	// Check if input has stopped
+	if time.Since(*lastInputTime) >= 200*time.Millisecond && *numberBuffer != "" {
+		if num, err := strconv.Atoi(*numberBuffer); err == nil && num >= 1 && num <= maxIndex {
+			*currentIndex = num - 1
+			*numberBuffer = ""
+			as.printPrompt(*currentIndex+1, maxIndex, "")
+		} else {
+			// Invalid number, clear buffer
+			*numberBuffer = ""
+			as.printPrompt(*currentIndex+1, maxIndex, "")
+		}
+	}
+}
+
+// navigateUp handles upward navigation with wraparound
+func (as *ArchetypeSelectionStage) navigateUp(currentIndex, maxIndex int) int {
+	if currentIndex <= 0 {
+		return maxIndex - 1 // Wrap to last item
+	}
+	return currentIndex - 1
+}
+
+// navigateDown handles downward navigation with wraparound
+func (as *ArchetypeSelectionStage) navigateDown(currentIndex, maxIndex int) int {
+	if currentIndex >= maxIndex-1 {
+		return 0 // Wrap to first item
+	}
+	return currentIndex + 1
+}
+
+// updateDisplay refreshes the table and prompt
+func (as *ArchetypeSelectionStage) updateDisplay(archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int, currentIndex int, numberBuffer string) {
+	// Move cursor up to table start and re-render
+	fmt.Printf("\033[%dA", len(archetypes)+3) // Move up past table + separator + prompt
+	as.renderTableWithHighlight(archetypes, formatter, columnWidths, currentIndex, false)
+	as.renderPrompt(currentIndex+1, len(archetypes), numberBuffer)
+}
+
+// renderTableWithHighlight renders the table with current selection highlighted
+func (as *ArchetypeSelectionStage) renderTableWithHighlight(archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int, highlightIndex int, isSelected bool) {
+	for i, archetype := range archetypes {
+		var selectionCol string
+		var nameColor string
+		var nameStyle string
+
+		if isSelected && i == highlightIndex {
+			// Final selection: green with checkmark
+			selectionCol = " ✓"
+			nameColor = "92" // Bright green
+			nameStyle = ""
+		} else if i == highlightIndex {
+			// Current highlight: blue italic with arrow
+			selectionCol = " >"
+			nameColor = "94" // Bright blue
+			nameStyle = "\033[3m" // Italic
+		} else {
+			// Default: normal white
+			selectionCol = "  "
+			nameColor = "97" // White
+			nameStyle = ""
+		}
+
+		number := fmt.Sprintf("%02d.", i+1)
+		framework := as.getFrameworkDisplay(archetype)
+		language := as.getLanguageDisplay(archetype)
+		appType := fmt.Sprintf("'%s'", archetype.ID)
+
+		// Apply styling to the name column
+		styledName := fmt.Sprintf("%s\033[%sm%s\033[0m", nameStyle, nameColor, archetype.Name)
+
+		values := []string{selectionCol, number, styledName, framework, language, appType}
+		colors := []string{"92", "90", "", "90", "90", "94"} // Empty color for name since we handle it manually
+
+		rowText := formatter.FormatRowWithWidths(values, colors, columnWidths)
+		fmt.Printf("\033[K%s\n", rowText) // Clear line and print row
+	}
+
+	// Print separator
+	width := getTerminalWidthForSelector()
+	separator := strings.Repeat("-", width)
+	fmt.Printf("\033[K\033[90m%s\033[0m\n", separator)
+}
+
+// renderPrompt displays the selection prompt
+func (as *ArchetypeSelectionStage) renderPrompt(currentSelection, total int, numberBuffer string) {
+	if numberBuffer != "" {
+		fmt.Printf("\r\033[K? Select an archetype (1-%d): %s", total, numberBuffer)
+	} else {
+		fmt.Printf("\r\033[K? Select an archetype (1-%d): %d", total, currentSelection)
+	}
+}
+
+// fallbackSelection implements the original simple selection mode
+func (as *ArchetypeSelectionStage) fallbackSelection(archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int) (*ArchetypeDefinition, error) {
+	// Print each archetype as a numbered row using calculated widths (original implementation)
+	for i, archetype := range archetypes {
+		selectionCol := "  " // Empty for simple mode
+		number := fmt.Sprintf("%02d.", i+1)
+
+		// Map archetype to display values
+		framework := as.getFrameworkDisplay(archetype)
+		language := as.getLanguageDisplay(archetype)
+		appType := fmt.Sprintf("'%s'", archetype.ID)
+
+		// Format the row using calculated widths (same pattern as templates view)
+		values := []string{selectionCol, number, archetype.Name, framework, language, appType}
+		colors := []string{"90", "90", "97", "90", "90", "94"}
+		rowText := formatter.FormatRowWithWidths(values, colors, columnWidths)
+
+		fmt.Println(rowText)
+	}
+
+	// Width-aware separator
+	width := getTerminalWidthForSelector()
+	separator := strings.Repeat("-", width)
+	fmt.Printf("\n\033[90m%s\033[0m\n\n", separator)
+
+	// Simple selection loop (original implementation)
+	for {
+		fmt.Print("? Select an archetype (1-" + strconv.Itoa(len(archetypes)) + "): ")
+
+		input, err := as.reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read selection: %w", err)
+		}
+
+		choice := strings.TrimSpace(input)
+		if choice == "" {
+			continue
+		}
+
+		// Parse the selection
+		selectedIndex, err := strconv.Atoi(choice)
+		if err != nil || selectedIndex < 1 || selectedIndex > len(archetypes) {
+			fmt.Printf("\033[91mInvalid selection. Please enter a number between 1 and %d.\033[0m\n", len(archetypes))
+			continue
+		}
+
+		// Get the selected archetype
+		selected := archetypes[selectedIndex-1]
+
+		// Display selection confirmation with new styling
+		fmt.Printf("\n\033[92m[✓] %s\033[0m\n", selected.Name)
+
+		return selected, nil
+	}
+}
+
+// renderInteractiveTable renders the table with highlighting for the current selection
+func (as *ArchetypeSelectionStage) renderInteractiveTable(archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int, highlightIndex int) {
+	// Clear screen completely and start fresh
+	fmt.Printf("\033[2J\033[H")
+
+	// Re-render the wizard header
+	header := components.NewHeader("ENGX NEW APPLICATION WIZARD")
+	fmt.Print(header.Render())
+
+	// Re-render the intro text
+	fmt.Printf("\033[90mLet's get your application configured and setup for development, this is the \033[93mGUIDED MODE\033[90m that is the default with \033[38;5;198mengx\033[0m \033[38;5;208mcreate\033[0m\033[90m. You can bypass this by specifying an \033[38;5;48m--app-type\033[0m\033[90m directly in the create command:\033[0m\n\n")
+
+	// Smart command formatting with syntax highlighting
+	cmdFormatter := components.NewCommandFormatter()
+	fmt.Printf("%s\n\n", cmdFormatter.FormatCommandInBackticks("engx create <AppName> --app-type <app-type>"))
+
+	// Re-render the selection header
+	selectionHeader := components.NewHeader("SELECT YOUR APPLICATION TYPE")
+	fmt.Print(selectionHeader.Render())
+	fmt.Printf("%s\n", formatter.FormatHeaderWithWidths(columnWidths))
+
+	// Render each row with highlighting
+	for i, archetype := range archetypes {
+		var selectionCol string
+		var nameColor string
+		var nameStyle string
+
+		if i == highlightIndex {
+			// Current highlight: blue italic with arrow
+			selectionCol = " >"
+			nameColor = "94" // Bright blue
+			nameStyle = "\033[3m" // Italic
+		} else {
+			// Default: normal white
+			selectionCol = "  "
+			nameColor = "97" // White
+			nameStyle = ""
+		}
+
+		number := fmt.Sprintf("%02d.", i+1)
+		framework := as.getFrameworkDisplay(archetype)
+		language := as.getLanguageDisplay(archetype)
+		appType := fmt.Sprintf("'%s'", archetype.ID)
+
+		// Apply styling to the name column
+		styledName := fmt.Sprintf("%s\033[%sm%s\033[0m", nameStyle, nameColor, archetype.Name)
+
+		values := []string{selectionCol, number, styledName, framework, language, appType}
+		colors := []string{"90", "90", "", "90", "90", "94"} // Empty color for name since we handle it manually
+
+		rowText := formatter.FormatRowWithWidths(values, colors, columnWidths)
+		fmt.Println(rowText)
+	}
+
+	// Width-aware separator
+	width := getTerminalWidthForSelector()
+	separator := strings.Repeat("-", width)
+	fmt.Printf("\n\033[90m%s\033[0m\n", separator)
+
+	// Initial prompt
+	fmt.Printf("\n ? Select an archetype (1-%d): %d", len(archetypes), highlightIndex+1)
+}
+
+// updateInteractiveDisplay updates the highlighting and prompt by clearing and re-rendering
+func (as *ArchetypeSelectionStage) updateInteractiveDisplay(archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int, currentIndex int, numberBuffer string) {
+	// Simple approach: clear screen and re-render everything
+	as.renderInteractiveTable(archetypes, formatter, columnWidths, currentIndex)
+
+	// Update the prompt with current state
+	if numberBuffer != "" {
+		fmt.Printf("\r ? Select an archetype (1-%d): %s", len(archetypes), numberBuffer)
+	}
+}
+
+// updatePromptOnly updates only the prompt line for number input
+func (as *ArchetypeSelectionStage) updatePromptOnly(currentSelection, total int, numberBuffer string) {
+	if numberBuffer != "" {
+		fmt.Printf("\r\033[K ? Select an archetype (1-%d): %s", total, numberBuffer)
+	} else {
+		fmt.Printf("\r\033[K ? Select an archetype (1-%d): %d", total, currentSelection)
+	}
+}
+
+// handleNumberInputInteractive processes debounced number input for interactive mode
+func (as *ArchetypeSelectionStage) handleNumberInputInteractive(currentIndex *int, numberBuffer *string, lastInputTime *time.Time, maxIndex int, archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int) {
+	time.Sleep(200 * time.Millisecond) // Debounce delay
+
+	// Check if input has stopped
+	if time.Since(*lastInputTime) >= 200*time.Millisecond && *numberBuffer != "" {
+		if num, err := strconv.Atoi(*numberBuffer); err == nil && num >= 1 && num <= maxIndex {
+			*currentIndex = num - 1
+			*numberBuffer = ""
+			as.updateInteractiveDisplay(archetypes, formatter, columnWidths, *currentIndex, "")
+		} else {
+			// Invalid number, clear buffer
+			*numberBuffer = ""
+			as.updatePromptOnly(*currentIndex+1, maxIndex, "")
+		}
+	}
+}
+
+// printStaticTable renders the table once without dynamic updates (for fallback mode)
+func (as *ArchetypeSelectionStage) printStaticTable(archetypes []*ArchetypeDefinition, formatter *components.TableFormatter, columnWidths []int) {
+	for i, archetype := range archetypes {
+		selectionCol := "  " // Empty for static display
+		number := fmt.Sprintf("%02d.", i+1)
+		framework := as.getFrameworkDisplay(archetype)
+		language := as.getLanguageDisplay(archetype)
+		appType := fmt.Sprintf("'%s'", archetype.ID)
+
+		values := []string{selectionCol, number, archetype.Name, framework, language, appType}
+		colors := []string{"90", "90", "97", "90", "90", "94"}
+		rowText := formatter.FormatRowWithWidths(values, colors, columnWidths)
+
+		fmt.Println(rowText)
+	}
+
+	// Width-aware separator
+	width := getTerminalWidthForSelector()
+	separator := strings.Repeat("-", width)
+	fmt.Printf("\n\033[90m%s\033[0m\n\n", separator)
+}
+
+// printPrompt displays and updates only the prompt line (for fallback mode)
+func (as *ArchetypeSelectionStage) printPrompt(currentSelection, total int, numberBuffer string) {
+	if numberBuffer != "" {
+		fmt.Printf("\r\033[K ? Select an archetype (1-%d): %s", total, numberBuffer)
+	} else {
+		fmt.Printf("\r\033[K ? Select an archetype (1-%d): %d", total, currentSelection)
+	}
 }
 
 // getTerminalWidthForSelector gets the current terminal width for responsive separator

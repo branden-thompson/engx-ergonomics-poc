@@ -37,8 +37,33 @@ func NewTracker(steps []Step) *Tracker {
 	}
 }
 
+// ArchetypeType represents different application archetypes
+type ArchetypeType string
+
+const (
+	ArchetypeReactProd    ArchetypeType = "prod-web"    // Production React App
+	ArchetypeReactDev     ArchetypeType = "dev-web"     // Development React App
+	ArchetypeHackday      ArchetypeType = "hackday"     // Hackday Prototype
+	ArchetypeEngXCmd      ArchetypeType = "engx-cmd"    // EngX Command Plugin
+	ArchetypeCLI          ArchetypeType = "cli"         // Command Line Tool
+	ArchetypeService      ArchetypeType = "service"     // Backend Service
+	ArchetypeDefault      ArchetypeType = "default"     // Fallback
+)
+
 // NewCreateTracker creates a tracker for the 'create' command simulation
 func NewCreateTracker(devOnly bool) *Tracker {
+	return NewCreateTrackerForArchetype(ArchetypeDefault, devOnly)
+}
+
+// NewCreateTrackerForArchetype creates a tracker for a specific archetype
+func NewCreateTrackerForArchetype(archetype ArchetypeType, devOnly bool) *Tracker {
+	steps := getStepsForArchetype(archetype, devOnly)
+	return NewTracker(steps)
+}
+
+// getStepsForArchetype returns archetype-specific steps
+func getStepsForArchetype(archetype ArchetypeType, devOnly bool) []Step {
+	// Common initial steps
 	steps := []Step{
 		{
 			Name:        "Validating configuration",
@@ -56,26 +81,90 @@ func NewCreateTracker(devOnly bool) *Tracker {
 			CanRetry:    true,
 			Description: "Creates project directory, sets up git repository, configures development tools",
 		},
-		{
+	}
+
+	// Archetype-specific dependency installation
+	switch archetype {
+	case ArchetypeReactProd, ArchetypeReactDev, ArchetypeHackday:
+		steps = append(steps, Step{
 			Name:        "Installing dependencies",
 			Message:     "📦 Installing React and core dependencies...",
 			Duration:    time.Millisecond * 3000,
 			ErrorRate:   0.15, // 15% chance of network/install error
 			CanRetry:    true,
 			Description: "Downloads and installs React, TypeScript, testing libraries, and build tools",
-		},
-		{
+		})
+	case ArchetypeEngXCmd, ArchetypeCLI, ArchetypeService:
+		steps = append(steps, Step{
+			Name:        "Installing dependencies",
+			Message:     "📦 Installing Go modules and CLI dependencies...",
+			Duration:    time.Millisecond * 2500,
+			ErrorRate:   0.12, // 12% chance of network/install error
+			CanRetry:    true,
+			Description: "Downloads and installs Go dependencies, CLI frameworks, and build tools",
+		})
+	default:
+		steps = append(steps, Step{
+			Name:        "Installing dependencies",
+			Message:     "📦 Installing core dependencies...",
+			Duration:    time.Millisecond * 2000,
+			ErrorRate:   0.10,
+			CanRetry:    true,
+			Description: "Downloads and installs project dependencies and build tools",
+		})
+	}
+
+	// Archetype-specific project structure generation
+	switch archetype {
+	case ArchetypeReactProd, ArchetypeReactDev, ArchetypeHackday:
+		steps = append(steps, Step{
 			Name:        "Generating project structure",
-			Message:     "🏗️ Creating project files and folder structure...",
+			Message:     "🏗️ Creating React components and folder structure...",
 			Duration:    time.Millisecond * 2200,
 			ErrorRate:   0.02, // 2% chance of filesystem error
 			CanRetry:    true,
-			Description: "Generates source code structure, configuration files, and example components",
-		},
+			Description: "Generates React components, pages, hooks, and modern project structure",
+		})
+	case ArchetypeEngXCmd:
+		steps = append(steps, Step{
+			Name:        "Generating project structure",
+			Message:     "🏗️ Creating EngX plugin structure and commands...",
+			Duration:    time.Millisecond * 2000,
+			ErrorRate:   0.02,
+			CanRetry:    true,
+			Description: "Generates plugin architecture, command handlers, and EngX integration",
+		})
+	case ArchetypeCLI:
+		steps = append(steps, Step{
+			Name:        "Generating project structure",
+			Message:     "🏗️ Creating CLI command structure and handlers...",
+			Duration:    time.Millisecond * 1800,
+			ErrorRate:   0.02,
+			CanRetry:    true,
+			Description: "Generates command structure, argument parsing, and CLI interface",
+		})
+	case ArchetypeService:
+		steps = append(steps, Step{
+			Name:        "Generating project structure",
+			Message:     "🏗️ Creating service architecture and API handlers...",
+			Duration:    time.Millisecond * 2400,
+			ErrorRate:   0.02,
+			CanRetry:    true,
+			Description: "Generates service structure, API endpoints, and backend architecture",
+		})
+	default:
+		steps = append(steps, Step{
+			Name:        "Generating project structure",
+			Message:     "🏗️ Creating project files and folder structure...",
+			Duration:    time.Millisecond * 2000,
+			ErrorRate:   0.02,
+			CanRetry:    true,
+			Description: "Generates project structure, configuration files, and basic components",
+		})
 	}
 
-	// Add production setup step if not dev-only
-	if !devOnly {
+	// Production setup (only for production archetypes and when not dev-only)
+	if !devOnly && (archetype == ArchetypeReactProd || archetype == ArchetypeService) {
 		steps = append(steps, Step{
 			Name:        "Configuring production setup",
 			Message:     "🚀 Setting up build pipeline and deployment configuration...",
@@ -86,37 +175,72 @@ func NewCreateTracker(devOnly bool) *Tracker {
 		})
 	}
 
-	// Add testing frameworks step
-	steps = append(steps, Step{
-		Name:        "Installing Testing Frameworks",
-		Message:     "🧪 Setting up testing infrastructure...",
-		Duration:    time.Millisecond * 1800,
-		ErrorRate:   0.05, // 5% chance of testing setup error
-		CanRetry:    true,
-		Description: "Installs and configures Vitest, testing utilities, and coverage tools",
-	})
+	// Archetype-specific testing setup
+	switch archetype {
+	case ArchetypeReactProd, ArchetypeReactDev, ArchetypeHackday:
+		steps = append(steps, Step{
+			Name:        "Installing Testing Frameworks",
+			Message:     "🧪 Setting up Vitest and React testing utilities...",
+			Duration:    time.Millisecond * 1800,
+			ErrorRate:   0.05, // 5% chance of testing setup error
+			CanRetry:    true,
+			Description: "Installs and configures Vitest, React Testing Library, and coverage tools",
+		})
+	case ArchetypeEngXCmd, ArchetypeCLI, ArchetypeService:
+		steps = append(steps, Step{
+			Name:        "Installing Testing Frameworks",
+			Message:     "🧪 Setting up Go testing and benchmarking tools...",
+			Duration:    time.Millisecond * 1500,
+			ErrorRate:   0.05,
+			CanRetry:    true,
+			Description: "Configures Go testing, benchmarking, and code coverage tools",
+		})
+	default:
+		steps = append(steps, Step{
+			Name:        "Installing Testing Frameworks",
+			Message:     "🧪 Setting up testing infrastructure...",
+			Duration:    time.Millisecond * 1600,
+			ErrorRate:   0.05,
+			CanRetry:    true,
+			Description: "Installs and configures testing utilities and coverage tools",
+		})
+	}
 
-	// Add documentation generation step
+	// Documentation generation
 	steps = append(steps, Step{
 		Name:        "Generating Documentation",
 		Message:     "📚 Creating project documentation...",
 		Duration:    time.Millisecond * 1200,
 		ErrorRate:   0.02, // 2% chance of documentation error
 		CanRetry:    true,
-		Description: "Generates README, API docs, and component documentation",
+		Description: "Generates README, API docs, and project documentation",
 	})
 
-	// Final step
+	// Final step with archetype-specific message
+	var finalMessage string
+	switch archetype {
+	case ArchetypeReactProd, ArchetypeReactDev, ArchetypeHackday:
+		finalMessage = "✨ React application ready for development!"
+	case ArchetypeEngXCmd:
+		finalMessage = "✨ EngX plugin ready for development!"
+	case ArchetypeCLI:
+		finalMessage = "✨ CLI tool ready for development!"
+	case ArchetypeService:
+		finalMessage = "✨ Backend service ready for development!"
+	default:
+		finalMessage = "✨ Project ready for development!"
+	}
+
 	steps = append(steps, Step{
 		Name:        "Finalizing Setup",
-		Message:     "✨ Project ready for development!",
+		Message:     finalMessage,
 		Duration:    time.Millisecond * 800,
 		ErrorRate:   0.0, // No errors on final step
 		CanRetry:    false,
-		Description: "Completes setup, runs initial health checks, and prepares development server",
+		Description: "Completes setup, runs initial health checks, and prepares development environment",
 	})
 
-	return NewTracker(steps)
+	return steps
 }
 
 // Start begins the progress simulation

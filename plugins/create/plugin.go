@@ -371,12 +371,17 @@ func (p *Plugin) executeGuidedMode(cmd *cobra.Command, deps *common.Dependencies
 	userConfig.ProjectName = updatedContext.AppName
 	updatedContext.UserConfiguration = userConfig
 
-	// Initialize and run TUI with configuration already set
+	// Initialize and run TUI with configuration already set and archetype information
 	var model *models.AppModel
+	archetypeID := ""
+	if updatedContext.SelectedArchetype != nil {
+		archetypeID = updatedContext.SelectedArchetype.ID
+	}
+
 	if chaosInjector != nil {
-		model = models.NewAppModelWithChaos("create", updatedContext.AppName, flags, userConfig, verbosityConfig, chaosInjector)
+		model = models.NewAppModelWithArchetypeAndChaos("create", updatedContext.AppName, flags, userConfig, verbosityConfig, archetypeID, chaosInjector)
 	} else {
-		model = models.NewAppModelWithVerbosity("create", updatedContext.AppName, flags, userConfig, verbosityConfig)
+		model = models.NewAppModelWithArchetype("create", updatedContext.AppName, flags, userConfig, verbosityConfig, archetypeID)
 	}
 
 	// Configure for inline mode with proper input/output handling

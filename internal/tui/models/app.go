@@ -71,6 +71,9 @@ type AppModel struct {
 
 	// Verbosity configuration
 	verbosityConfig *config.VerbosityConfig
+
+	// Archetype information
+	archetypeType progresssim.ArchetypeType
 }
 
 // getTemplateFromFlags extracts template from flags or returns default
@@ -231,6 +234,105 @@ func NewAppModelWithConfig(command, target string, flags []string, userConfig *c
 		aarGenerator:       aarGen,
 		showAAR:            false,
 		verbosityConfig:    config.NewVerbosityConfig(config.VerbosityDefault), // Default verbosity
+	}
+}
+
+// NewAppModelWithArchetype creates a new app model with archetype-specific tracker
+func NewAppModelWithArchetype(command, target string, flags []string, userConfig *config.UserConfiguration, verbosityConfig *config.VerbosityConfig, archetypeID string) *AppModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = styles.InfoStyle
+
+	// Extract devOnly flag from flags
+	var devOnly bool = false
+	for _, flag := range flags {
+		if flag == "--dev-only" {
+			devOnly = true
+			break
+		}
+	}
+
+	// Convert archetype ID to ArchetypeType for tracker
+	archetypeType := progresssim.ArchetypeDefault
+	switch archetypeID {
+	case "prod-web":
+		archetypeType = progresssim.ArchetypeReactProd
+	case "dev-web":
+		archetypeType = progresssim.ArchetypeReactDev
+	case "hackday":
+		archetypeType = progresssim.ArchetypeHackday
+	case "engx-cmd":
+		archetypeType = progresssim.ArchetypeEngXCmd
+	case "cli":
+		archetypeType = progresssim.ArchetypeCLI
+	case "service":
+		archetypeType = progresssim.ArchetypeService
+	}
+
+	// Create progress tracker based on command and archetype
+	var tracker *progresssim.Tracker
+	var stepNames []string
+
+	if command == "create" {
+		tracker = progresssim.NewCreateTrackerForArchetype(archetypeType, devOnly)
+
+		// Extract step names directly from tracker to ensure perfect alignment
+		tempTracker := progresssim.NewCreateTrackerForArchetype(archetypeType, devOnly)
+		tempTracker.Start()
+
+		stepNames = make([]string, tempTracker.TotalSteps())
+		for i := 0; i < tempTracker.TotalSteps(); i++ {
+			// Advance to step i
+			for j := 0; j < i; j++ {
+				tempTracker.NextStep()
+			}
+			stepInfo := tempTracker.CurrentStepInfo()
+			if stepInfo != nil {
+				stepNames[i] = stepInfo.Name
+			}
+			// Reset for next iteration
+			tempTracker = progresssim.NewCreateTrackerForArchetype(archetypeType, devOnly)
+			tempTracker.Start()
+		}
+	}
+
+	// Create enhanced renderer with user configuration, verbosity settings, and archetype
+	appName := target
+	targetDir := fmt.Sprintf("./%s", target)
+	template := userConfig.Template.Type.String()
+	renderer := components.NewEnhancedRendererWithArchetype(appName, targetDir, template, stepNames, devOnly, archetypeType)
+
+	// Initialize with empty logs - all info is shown in the template
+	initialLogs := []string{}
+
+	// Initialize AAR generator
+	startTime := time.Now()
+	projectPath := fmt.Sprintf("./%s", target)
+	aarGen := aar.NewAARGenerator(tracker, userConfig, startTime, projectPath)
+
+	// Debug output for archetype and verbosity configuration
+	verbosityConfig.DebugPrint("AppModel initialized with archetype %s (%s), verbosity level: %s", archetypeID, archetypeType, verbosityConfig.Level.String())
+	verbosityConfig.DebugPrint("Tracker total steps: %d", tracker.TotalSteps())
+
+	return &AppModel{
+		state:              StateIdle,
+		command:            command,
+		target:             target,
+		flags:              flags,
+		userConfig:         userConfig,    // Pre-configured from inline prompts
+		skipPrompts:        true,          // Skip TUI prompts since we already have config
+		promptOrchestrator: PromptOrchestrator{}, // Empty orchestrator since we skip prompts
+		spinner:            s,
+		renderer:           renderer,
+		tracker:            tracker,
+		startTime:          startTime,
+		totalSteps:         tracker.TotalSteps(), // IMPORTANT: Set total steps for progress tracking
+		logs:               initialLogs,
+		completed:          false,
+		aarGenerator:       aarGen,
+		showAAR:            false,
+		verbosityConfig:    verbosityConfig,
+		archetypeType:      archetypeType, // Store archetype for sub-step generation
 	}
 }
 
@@ -626,15 +728,18 @@ func (m *AppModel) GetAAROutput() string {
 	return ""
 }
 
-// getSubSteps returns sub-steps for the current step
+// getSubSteps returns archetype-specific sub-steps for the current step
 func (m *AppModel) getSubSteps(stepName string) []string {
+	// Determine archetype type from tracker or user config
+	archetypeType := m.determineArchetypeType()
+
 	switch stepName {
 	case "Validating configuration":
 		return []string{
 			"Checking project name validity",
 			"Verifying directory permissions",
 			"Scanning for naming conflicts",
-			"Validating Node.js version",
+			m.getVersionValidationStep(archetypeType),
 		}
 	case "Setting up environment":
 		return []string{
@@ -644,33 +749,179 @@ func (m *AppModel) getSubSteps(stepName string) []string {
 			"Configuring development environment",
 		}
 	case "Installing dependencies":
-		return []string{
-			"Installing React v18.2.0",
-			"Installing TypeScript v5.1.6",
-			"Installing Vite v4.4.5",
-			"Installing testing dependencies",
-		}
+		return m.getDependencySteps(archetypeType)
 	case "Generating project structure":
-		return []string{
-			"Creating src/ directory",
-			"Generating App.tsx component",
-			"Setting up configuration files",
-			"Adding package.json scripts",
-		}
+		return m.getProjectStructureSteps(archetypeType)
 	case "Configuring production setup":
 		return []string{
 			"Setting up build optimization",
 			"Configuring environment variables",
 			"Preparing deployment scripts",
 		}
+	case "Installing Testing Frameworks":
+		return m.getTestingSteps(archetypeType)
+	case "Generating Documentation":
+		return []string{
+			"Creating README.md",
+			"Generating API documentation",
+			"Setting up development guides",
+		}
 	case "Finalizing Setup":
+		return m.getFinalizationSteps(archetypeType)
+	default:
+		return []string{}
+	}
+}
+
+// determineArchetypeType determines the archetype type from stored context
+func (m *AppModel) determineArchetypeType() progresssim.ArchetypeType {
+	// Use stored archetype type if available
+	if m.archetypeType != "" {
+		return m.archetypeType
+	}
+
+	// Fallback to inference from template type for older constructors
+	if m.userConfig != nil && m.userConfig.Template.Type.String() != "" {
+		template := m.userConfig.Template.Type.String()
+		if template == "typescript" || template == "javascript" {
+			return progresssim.ArchetypeReactDev // Default React archetype
+		}
+	}
+	// Default fallback
+	return progresssim.ArchetypeDefault
+}
+
+// getVersionValidationStep returns version validation step based on archetype
+func (m *AppModel) getVersionValidationStep(archetype progresssim.ArchetypeType) string {
+	switch archetype {
+	case progresssim.ArchetypeReactProd, progresssim.ArchetypeReactDev, progresssim.ArchetypeHackday:
+		return "Validating Node.js version"
+	case progresssim.ArchetypeEngXCmd, progresssim.ArchetypeCLI, progresssim.ArchetypeService:
+		return "Validating Go version"
+	default:
+		return "Validating runtime version"
+	}
+}
+
+// getDependencySteps returns dependency installation steps based on archetype
+func (m *AppModel) getDependencySteps(archetype progresssim.ArchetypeType) []string {
+	switch archetype {
+	case progresssim.ArchetypeReactProd, progresssim.ArchetypeReactDev, progresssim.ArchetypeHackday:
+		return []string{
+			"Installing React v18.2.0",
+			"Installing TypeScript v5.1.6",
+			"Installing Vite v4.4.5",
+			"Installing build tools",
+		}
+	case progresssim.ArchetypeEngXCmd, progresssim.ArchetypeCLI, progresssim.ArchetypeService:
+		return []string{
+			"Installing Go modules",
+			"Installing CLI frameworks",
+			"Installing build dependencies",
+			"Setting up Go toolchain",
+		}
+	default:
+		return []string{
+			"Installing core dependencies",
+			"Installing build tools",
+			"Setting up package manager",
+			"Configuring runtime",
+		}
+	}
+}
+
+// getProjectStructureSteps returns project structure steps based on archetype
+func (m *AppModel) getProjectStructureSteps(archetype progresssim.ArchetypeType) []string {
+	switch archetype {
+	case progresssim.ArchetypeReactProd, progresssim.ArchetypeReactDev, progresssim.ArchetypeHackday:
+		return []string{
+			"Creating src/ directory",
+			"Generating React components",
+			"Setting up routing structure",
+			"Adding package.json scripts",
+		}
+	case progresssim.ArchetypeEngXCmd:
+		return []string{
+			"Creating cmd/ directory",
+			"Generating plugin handlers",
+			"Setting up EngX integration",
+			"Creating command structure",
+		}
+	case progresssim.ArchetypeCLI:
+		return []string{
+			"Creating cmd/ directory",
+			"Generating CLI commands",
+			"Setting up argument parsing",
+			"Creating help system",
+		}
+	case progresssim.ArchetypeService:
+		return []string{
+			"Creating internal/ directory",
+			"Generating API handlers",
+			"Setting up service architecture",
+			"Creating middleware stack",
+		}
+	default:
+		return []string{
+			"Creating project directories",
+			"Generating core files",
+			"Setting up configuration",
+			"Adding build scripts",
+		}
+	}
+}
+
+// getTestingSteps returns testing setup steps based on archetype
+func (m *AppModel) getTestingSteps(archetype progresssim.ArchetypeType) []string {
+	switch archetype {
+	case progresssim.ArchetypeReactProd, progresssim.ArchetypeReactDev, progresssim.ArchetypeHackday:
+		return []string{
+			"Installing Vitest framework",
+			"Setting up React Testing Library",
+			"Configuring test coverage",
+			"Creating test utilities",
+		}
+	case progresssim.ArchetypeEngXCmd, progresssim.ArchetypeCLI, progresssim.ArchetypeService:
+		return []string{
+			"Setting up Go testing",
+			"Configuring benchmarks",
+			"Installing test utilities",
+			"Setting up coverage tools",
+		}
+	default:
+		return []string{
+			"Installing test framework",
+			"Setting up test utilities",
+			"Configuring coverage",
+			"Creating test structure",
+		}
+	}
+}
+
+// getFinalizationSteps returns finalization steps based on archetype
+func (m *AppModel) getFinalizationSteps(archetype progresssim.ArchetypeType) []string {
+	switch archetype {
+	case progresssim.ArchetypeReactProd, progresssim.ArchetypeReactDev, progresssim.ArchetypeHackday:
+		return []string{
+			"Running initial build test",
+			"Validating React setup",
+			"Testing development server",
+			"Verifying TypeScript config",
+		}
+	case progresssim.ArchetypeEngXCmd, progresssim.ArchetypeCLI, progresssim.ArchetypeService:
+		return []string{
+			"Running go build test",
+			"Validating module structure",
+			"Testing command execution",
+			"Verifying Go dependencies",
+		}
+	default:
 		return []string{
 			"Running initial build test",
 			"Validating project structure",
-			"Generating README.md",
+			"Testing basic functionality",
+			"Verifying configuration",
 		}
-	default:
-		return []string{}
 	}
 }
 
@@ -873,6 +1124,19 @@ func (m *AppModel) updateComponentsFromConfig() {
 func NewAppModelWithChaos(command, target string, flags []string, userConfig *config.UserConfiguration, verbosityConfig *config.VerbosityConfig, chaosInjector chaos.ChaosInjector) *AppModel {
 	// Start with the basic model
 	model := NewAppModelWithVerbosity(command, target, flags, userConfig, verbosityConfig)
+
+	// Add chaos functionality if injector provided
+	if chaosInjector != nil {
+		model.chaosTracker = chaos.NewChaosAwareTracker(model.tracker, chaosInjector)
+	}
+
+	return model
+}
+
+// NewAppModelWithArchetypeAndChaos creates a new app model with archetype-specific tracker and chaos injection capabilities
+func NewAppModelWithArchetypeAndChaos(command, target string, flags []string, userConfig *config.UserConfiguration, verbosityConfig *config.VerbosityConfig, archetypeID string, chaosInjector chaos.ChaosInjector) *AppModel {
+	// Start with the archetype-aware model
+	model := NewAppModelWithArchetype(command, target, flags, userConfig, verbosityConfig, archetypeID)
 
 	// Add chaos functionality if injector provided
 	if chaosInjector != nil {
