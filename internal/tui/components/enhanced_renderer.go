@@ -500,7 +500,7 @@ func (r *EnhancedRenderer) renderHeader() string {
 
 	// Use modular progress bar system with terminal-width awareness
 	// Calculate used space: "Total Progress: " + " " + "100.0%" (percentage text only)
-	usedSpace := len("Total Progress: ") + 6 // 6 for "100.0%" + proper spacing
+	usedSpace := len("Total Progress: ") + 3 // 3 for perfect alignment spacing
 
 	config := ProgressBarConfig{
 		Width:          47,           // Fallback width
@@ -1239,8 +1239,8 @@ func (r *EnhancedRenderer) renderModularProgressBar(progress float64, state Prog
 				usedSpace += config.PercentagePad + 1 // +1 for space between bar and percentage
 			} else {
 				// When PercentagePad is 0, we need to account for actual percentage width
-				// "100.0%" = 6 characters + proper spacing
-				usedSpace += 6 // "100.0%" + proper spacing
+				// Adjusted for perfect alignment
+				usedSpace += 3 // Perfect alignment spacing
 			}
 		}
 		barWidth = config.AvailableWidth - usedSpace
