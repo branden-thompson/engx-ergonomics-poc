@@ -499,13 +499,13 @@ func (r *EnhancedRenderer) renderHeader() string {
 	}
 
 	// Use modular progress bar system with terminal-width awareness
-	// Calculate used space: "Total Progress: " + " " + " 100.0%" (with padding)
-	usedSpace := len("Total Progress: ") + 1 + 6 // 1 for space, 6 for percentage padding
+	// Calculate used space: "Total Progress: " + " " + "100.0%" (percentage text only)
+	usedSpace := len("Total Progress: ") + 1 + 6 // 1 for space, 6 for "100.0%"
 
 	config := ProgressBarConfig{
 		Width:          47,           // Fallback width
 		ShowPercentage: true,         // Show percentage
-		PercentagePad:  6,            // Right-align in 6 characters like original
+		PercentagePad:  0,            // No padding - we'll handle alignment manually
 		FillMode:       true,         // Use terminal-width aware sizing
 		AvailableWidth: r.totalWidth, // Use full terminal width
 		UsedWidth:      usedSpace,    // Space used by text and percentage
@@ -566,15 +566,22 @@ func (r *EnhancedRenderer) renderCurrentStepInfo(step Step) string {
 	}
 
 	// Calculate spacing to right-align the status (use plain text lengths for calculation)
-	plainStatusText := "✓ Done"   // Sample status for length calculation
-	maxMessageLength := r.totalWidth - len("Current Step: ") - len(plainStatusText) - 3
+	var plainStatusText string
+	if allComplete {
+		plainStatusText = "✓ Done"
+	} else {
+		plainStatusText = "⠋ Running..."
+	}
+
+	usedSpace := len("Current Step: ") + len(plainStatusText) + 1 // +1 for space between message and status
+	maxMessageLength := r.totalWidth - usedSpace
 
 	if len(message) > maxMessageLength {
 		message = message[:maxMessageLength-3] + "..."
 	}
 
 	padding := maxMessageLength - len(message)
-	return fmt.Sprintf("Current Step: %s%s %s", message, strings.Repeat(" ", padding), statusText)
+	return fmt.Sprintf("Current Step: %s%s%s", message, strings.Repeat(" ", padding), statusText)
 }
 
 // renderStepLine creates a single aligned step line with dynamic width
@@ -1259,8 +1266,13 @@ func (r *EnhancedRenderer) renderModularProgressBar(progress float64, state Prog
 		plainPercWidth = len(plainPercText)
 
 		// Combine with proper padding
-		paddedPercentage := fmt.Sprintf("%*s", config.PercentagePad, percentage)
-		combined = fmt.Sprintf("%s %s", progressBar, paddedPercentage)
+		if config.PercentagePad > 0 {
+			paddedPercentage := fmt.Sprintf("%*s", config.PercentagePad, percentage)
+			combined = fmt.Sprintf("%s %s", progressBar, paddedPercentage)
+		} else {
+			// For terminal-width aware progress bars, right-align the percentage
+			combined = fmt.Sprintf("%s %s", progressBar, percentage)
+		}
 	} else {
 		percentage = ""
 		combined = progressBar
