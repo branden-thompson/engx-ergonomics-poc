@@ -498,12 +498,17 @@ func (r *EnhancedRenderer) renderHeader() string {
 		progressState = StateQueued
 	}
 
-	// Use modular progress bar system
+	// Use modular progress bar system with terminal-width awareness
+	// Calculate used space: "Total Progress: " + " " + " 100.0%" (with padding)
+	usedSpace := len("Total Progress: ") + 1 + 6 // 1 for space, 6 for percentage padding
+
 	config := ProgressBarConfig{
-		Width:          47,        // Fixed width like original
-		ShowPercentage: true,      // Show percentage
-		PercentagePad:  6,         // Right-align in 6 characters like original
-		FillMode:       false,     // Use fixed width
+		Width:          47,           // Fallback width
+		ShowPercentage: true,         // Show percentage
+		PercentagePad:  6,            // Right-align in 6 characters like original
+		FillMode:       true,         // Use terminal-width aware sizing
+		AvailableWidth: r.totalWidth, // Use full terminal width
+		UsedWidth:      usedSpace,    // Space used by text and percentage
 	}
 	progressResult := r.renderModularProgressBar(overallProgress, progressState, config)
 
