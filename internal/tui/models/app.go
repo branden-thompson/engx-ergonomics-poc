@@ -131,7 +131,8 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := getTemplateFromFlags(flags)
-	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
+	defaultVerbosityConfig := config.NewVerbosityConfig(config.VerbosityDefault)
+	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly, defaultVerbosityConfig)
 
 	// Initialize with empty logs - all info is shown in the template
 	initialLogs := []string{}
@@ -157,6 +158,7 @@ func NewAppModel(command, target string, flags []string) *AppModel {
 		completed:          false,
 		aarGenerator:       aarGen,
 		showAAR:            false,
+		verbosityConfig:    defaultVerbosityConfig,
 	}
 }
 
@@ -206,7 +208,8 @@ func NewAppModelWithConfig(command, target string, flags []string, userConfig *c
 	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := userConfig.Template.Type.String()
-	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
+	defaultVerbosityConfig := config.NewVerbosityConfig(config.VerbosityDefault)
+	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly, defaultVerbosityConfig)
 
 	// Initialize with empty logs - all info is shown in the template
 	initialLogs := []string{}
@@ -233,7 +236,7 @@ func NewAppModelWithConfig(command, target string, flags []string, userConfig *c
 		completed:          false,
 		aarGenerator:       aarGen,
 		showAAR:            false,
-		verbosityConfig:    config.NewVerbosityConfig(config.VerbosityDefault), // Default verbosity
+		verbosityConfig:    defaultVerbosityConfig, // Default verbosity
 	}
 }
 
@@ -300,7 +303,7 @@ func NewAppModelWithArchetype(command, target string, flags []string, userConfig
 	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := userConfig.Template.Type.String()
-	renderer := components.NewEnhancedRendererWithArchetype(appName, targetDir, template, stepNames, devOnly, archetypeType)
+	renderer := components.NewEnhancedRendererWithArchetype(appName, targetDir, template, stepNames, devOnly, archetypeType, verbosityConfig)
 
 	// Initialize with empty logs - all info is shown in the template
 	initialLogs := []string{}
@@ -382,8 +385,7 @@ func NewAppModelWithVerbosity(command, target string, flags []string, userConfig
 	appName := target
 	targetDir := fmt.Sprintf("./%s", target)
 	template := userConfig.Template.Type.String()
-	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
-	// TODO: Update renderer to be verbosity-aware
+	renderer := components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly, verbosityConfig)
 
 	// Initialize with empty logs - all info is shown in the template
 	initialLogs := []string{}
@@ -1113,7 +1115,7 @@ func (m *AppModel) updateComponentsFromConfig() {
 	appName := m.target
 	targetDir := fmt.Sprintf("./%s", m.target)
 	template := m.userConfig.Template.Type.String()
-	m.renderer = components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly)
+	m.renderer = components.NewEnhancedRenderer(appName, targetDir, template, stepNames, devOnly, m.verbosityConfig)
 
 	// Update AAR generator with proper user configuration
 	projectPath := fmt.Sprintf("./%s", m.target)

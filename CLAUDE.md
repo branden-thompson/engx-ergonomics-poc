@@ -5,7 +5,7 @@
 - **Type**: LEVEL-1 SEV-0 POC
 - **Name**: engx-ergonomics-poc
 - **Focus**: Terminal-based simulation of engineering productivity tools and workflows
-- **Status**: PHASE 3 COMPLETE - Advanced Features Implemented
+- **Status**: PHASE 6 COMPLETE - Verbosity-Aware TUI Rendering System Implemented
 
 ## BRTOPS FRAMEWORK ACTIVE
 **CRITICAL**: This project operates under BRTOPS protocols with SEV-0 quality requirements.
@@ -32,6 +32,7 @@ React application creation remains a **core use case** demonstrating the interac
 3. **Phase 3**: Template discovery system and CLI interaction analytics
 4. **Phase 4**: TUI component system and footer styling enhancements
 5. **Phase 5**: Terminal-width aware progress bar system
+6. **Phase 6**: Verbosity-aware TUI rendering system
 
 #### 🎯 KEY ACHIEVEMENTS
 - **Template Discovery**: Complete React template browsing system (`engx templates`)
@@ -43,6 +44,7 @@ React application creation remains a **core use case** demonstrating the interac
 - **TUI Component System**: Archetype-aware application component display and animation
 - **Dynamic Footer Styling**: Language-specific color schemes with proper alignment
 - **Terminal-Width Aware Progress Bars**: Adaptive progress bars that fill available terminal width
+- **Verbosity-Aware TUI Rendering**: Comprehensive verbosity control system with 5 distinct output levels
 
 ### ARCHITECTURE OVERVIEW
 
@@ -138,6 +140,15 @@ engx dev {plugin|config|hotreload|generate}
 - **Space Calculation**: Precise calculation of used space for both progress bars and status text
 - **Cross-Terminal Support**: Tested across 40, 60, 80, and 120-column terminal widths
 
+#### Verbosity-Aware TUI Rendering (Phase 6)
+- **5-Level Verbosity System**: Quiet, Concise, Default, Verbose, Debug levels with distinct outputs
+- **Conditional Section Rendering**: Helper methods control visibility of steps list, footer info, and application components
+- **Quiet Mode Optimization**: Minimal output with timing information and single separator line
+- **Modular Timing Display**: `renderTimingInfo()` method provides timing data for quiet mode without footer overhead
+- **Separator Logic Fix**: Restructured conditional separator placement to prevent duplicate lines
+- **Verbosity Config Integration**: `VerbosityConfig` passed through all renderer constructors for consistent behavior
+- **Section Control Methods**: `shouldShowStepsList()`, `shouldShowFooterInfo()`, `shouldShowApplicationComponents()` for granular control
+
 #### Architecture Patterns Discovered
 - **Component Inference**: Detect archetype from component presence rather than explicit passing
 - **Color-Aware Formatting**: Separate display formatting from layout calculations
@@ -156,5 +167,5 @@ This POC successfully demonstrates:
 
 ---
 **BRTOPS Version**: 1.1.001
-**Project Status**: PHASE 5 COMPLETE - Terminal-Width Aware Progress Bar System with Proper Alignment Implemented
-**Next Phase**: Expand simulation scope with additional engineering productivity command categories
+**Project Status**: PHASE 6 COMPLETE - Verbosity-Aware TUI Rendering System with Comprehensive Output Control Implemented
+**Next Phase**: Expand simulation scope with additional engineering productivity command categories and advanced TUI interactions

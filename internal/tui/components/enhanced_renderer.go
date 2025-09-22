@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/bthompso/engx-ergonomics-poc/internal/config"
 	progresssim "github.com/bthompso/engx-ergonomics-poc/internal/simulation/progress"
 )
 
@@ -61,6 +63,9 @@ type EnhancedRenderer struct {
 
 	// Component management
 	componentManager *ComponentManager
+
+	// Verbosity configuration
+	verbosityConfig *config.VerbosityConfig
 }
 
 // Component represents any technology component with status
@@ -83,7 +88,7 @@ const (
 )
 
 // NewEnhancedRenderer creates a new enhanced renderer with comprehensive layout
-func NewEnhancedRenderer(appName, targetDir, template string, stepNames []string, isDevOnly bool) *EnhancedRenderer {
+func NewEnhancedRenderer(appName, targetDir, template string, stepNames []string, isDevOnly bool, verbosityConfig *config.VerbosityConfig) *EnhancedRenderer {
 	steps := make([]Step, len(stepNames))
 	for i, name := range stepNames {
 		steps[i] = Step{
@@ -123,11 +128,12 @@ func NewEnhancedRenderer(appName, targetDir, template string, stepNames []string
 		agenticCapabilities:    agenticCapabilities,
 		deploymentCapabilities: deploymentCapabilities,
 		componentManager:  NewComponentManagerForArchetype(coreTechnologies, engxIntegrations, qualityTesting, userAnalyticsTesting, agenticCapabilities, deploymentCapabilities),
+		verbosityConfig:   verbosityConfig,
 	}
 }
 
 // NewEnhancedRendererWithArchetype creates a new enhanced renderer with archetype-specific components
-func NewEnhancedRendererWithArchetype(appName, targetDir, template string, stepNames []string, isDevOnly bool, archetypeType progresssim.ArchetypeType) *EnhancedRenderer {
+func NewEnhancedRendererWithArchetype(appName, targetDir, template string, stepNames []string, isDevOnly bool, archetypeType progresssim.ArchetypeType, verbosityConfig *config.VerbosityConfig) *EnhancedRenderer {
 	steps := make([]Step, len(stepNames))
 	for i, name := range stepNames {
 		steps[i] = Step{
@@ -167,6 +173,7 @@ func NewEnhancedRendererWithArchetype(appName, targetDir, template string, stepN
 		agenticCapabilities:    agenticCapabilities,
 		deploymentCapabilities: deploymentCapabilities,
 		componentManager:  NewComponentManagerForArchetype(coreTechnologies, engxIntegrations, qualityTesting, userAnalyticsTesting, agenticCapabilities, deploymentCapabilities),
+		verbosityConfig:   verbosityConfig,
 	}
 }
 
@@ -397,11 +404,11 @@ func (r *EnhancedRenderer) Render(width int) string {
 	// Store the width for consistent formatting
 	r.totalWidth = width
 
-	// Header section (includes empty line between header and progress)
+	// Header section (includes empty line between header and progress) - ALWAYS SHOWN
 	output.WriteString(r.renderHeader())
 	output.WriteString("\n")
 
-	// Current step info
+	// Current step info - ALWAYS SHOWN
 	allComplete := r.GetOverallProgress() >= 1.0
 	if r.currentStep >= 0 && r.currentStep < len(r.steps) {
 		currentStepInfo := r.steps[r.currentStep]
@@ -411,40 +418,57 @@ func (r *EnhancedRenderer) Render(width int) string {
 		}
 	}
 
-	// Empty line before separator
-	output.WriteString("\n")
-
-	// Top separator
-	output.WriteString(r.renderSeparatorLine())
-	output.WriteString("\n")
-
-	// Main steps section
-	for i, step := range r.steps {
-		stepLine := r.renderStepLine(i, step)
-		output.WriteString(stepLine)
+	// For quiet mode, add timing information after current step info
+	if !r.shouldShowStepsList() && !r.shouldShowFooterInfo() {
+		output.WriteString(r.renderTimingInfo())
 		output.WriteString("\n")
 	}
 
-	// Middle separator
-	output.WriteString(r.renderSeparatorLine())
+	// Empty line before separator - ALWAYS SHOWN
 	output.WriteString("\n")
 
-	// Footer info section
-	output.WriteString(r.renderFooterInfo())
-	output.WriteString("\n")
+	// Main steps section - VERBOSITY AWARE (hidden in quiet mode)
+	if r.shouldShowStepsList() {
+		// Top separator (only if steps are shown)
+		output.WriteString(r.renderSeparatorLine())
+		output.WriteString("\n")
 
-	// Bottom separator
-	output.WriteString(r.renderSeparatorLine())
-	output.WriteString("\n")
+		for i, step := range r.steps {
+			stepLine := r.renderStepLine(i, step)
+			output.WriteString(stepLine)
+			output.WriteString("\n")
+		}
 
-	// Empty line for breathing space (as shown in template)
-	output.WriteString("\n")
+		// Middle separator (only if steps are shown)
+		output.WriteString(r.renderSeparatorLine())
+		output.WriteString("\n")
 
-	// Application Components section
-	output.WriteString(r.renderApplicationComponents())
+		// Footer info section - VERBOSITY AWARE (hidden in quiet mode)
+		if r.shouldShowFooterInfo() {
+			output.WriteString(r.renderFooterInfo())
+			output.WriteString("\n")
 
-	// Final separator
-	output.WriteString(r.renderSeparatorLine())
+			// Bottom separator (only if footer is shown)
+			output.WriteString(r.renderSeparatorLine())
+			output.WriteString("\n")
+		}
+
+		// Empty line for breathing space (only if steps are shown)
+		output.WriteString("\n")
+	}
+
+	// Application Components section - VERBOSITY AWARE (hidden in quiet and concise modes)
+	if r.shouldShowApplicationComponents() {
+		output.WriteString(r.renderApplicationComponents())
+
+		// Final separator (only if components are shown)
+		output.WriteString(r.renderSeparatorLine())
+	}
+
+	// Final separator for quiet mode (no extra separator, just one)
+	if !r.shouldShowStepsList() && !r.shouldShowApplicationComponents() {
+		output.WriteString(r.renderSeparatorLine())
+	}
 
 	return output.String()
 }
@@ -737,6 +761,32 @@ func (r *EnhancedRenderer) getFrameworkLanguageDisplay() (string, string) {
 	default:
 		return r.template, r.template
 	}
+}
+
+// renderTimingInfo creates just the timing line for quiet mode
+func (r *EnhancedRenderer) renderTimingInfo() string {
+	// Timing information
+	elapsed := time.Since(r.startTime)
+	elapsedFormatted := formatDuration(elapsed)
+
+	// Estimate remaining time based on progress
+	var estimatedRemaining string
+	if progress := r.GetOverallProgress(); progress > 0 && progress < 1.0 {
+		totalEstimated := time.Duration(float64(elapsed) / progress)
+		remaining := totalEstimated - elapsed
+		estimatedRemaining = formatDuration(remaining)
+	} else {
+		estimatedRemaining = "00h 00m 00s"
+	}
+
+	lineLeft := fmt.Sprintf("Estimated Time Remaining: %s", estimatedRemaining)
+	lineRight := fmt.Sprintf("Elapsed Time: %s", elapsedFormatted)
+	padding := r.totalWidth - len(lineLeft) - len(lineRight)
+	if padding > 0 {
+		return lineLeft + strings.Repeat(" ", padding) + lineRight
+	}
+
+	return lineLeft + " " + lineRight
 }
 
 // renderFooterInfo creates the footer with timing and directory info
@@ -1584,5 +1634,55 @@ func (r *EnhancedRenderer) updateQualityComponentStatus(name, status string) {
 			r.qualityTesting[i].Status = status
 			break
 		}
+	}
+}
+
+// shouldShowApplicationComponents determines if APPLICATION COMPONENTS section should be shown based on verbosity level
+func (r *EnhancedRenderer) shouldShowApplicationComponents() bool {
+	if r.verbosityConfig == nil {
+		return true // Default to showing if no config
+	}
+
+	switch r.verbosityConfig.Level {
+	case config.VerbosityQuiet:
+		return false // Hide components section in quiet mode
+	case config.VerbosityConcise:
+		return false // Hide components section in concise mode
+	case config.VerbosityDefault, config.VerbosityVerbose, config.VerbosityDebug:
+		return true // Show components section in normal, verbose, and debug modes
+	default:
+		return true // Default to showing
+	}
+}
+
+// shouldShowStepsList determines if the main steps section should be shown based on verbosity level
+func (r *EnhancedRenderer) shouldShowStepsList() bool {
+	if r.verbosityConfig == nil {
+		return true // Default to showing if no config
+	}
+
+	switch r.verbosityConfig.Level {
+	case config.VerbosityQuiet:
+		return false // Hide steps list in quiet mode
+	case config.VerbosityConcise, config.VerbosityDefault, config.VerbosityVerbose, config.VerbosityDebug:
+		return true // Show steps list in concise, normal, verbose, and debug modes
+	default:
+		return true // Default to showing
+	}
+}
+
+// shouldShowFooterInfo determines if the footer info section should be shown based on verbosity level
+func (r *EnhancedRenderer) shouldShowFooterInfo() bool {
+	if r.verbosityConfig == nil {
+		return true // Default to showing if no config
+	}
+
+	switch r.verbosityConfig.Level {
+	case config.VerbosityQuiet:
+		return false // Hide footer info in quiet mode
+	case config.VerbosityConcise, config.VerbosityDefault, config.VerbosityVerbose, config.VerbosityDebug:
+		return true // Show footer info in concise, normal, verbose, and debug modes
+	default:
+		return true // Default to showing
 	}
 }
