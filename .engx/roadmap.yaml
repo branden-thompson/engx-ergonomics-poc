@@ -1,0 +1,134 @@
+# EngX Roadmap Configuration
+# Defines command roadmap and interface layout for `engx` root command
+
+metadata:
+  version: "1.0"
+  updated: "2025-09-23"
+  cli_version: "v0.8.0"
+
+user_context:
+  default_crew: "CREW-1234"
+  ldap_source: "system"  # system = get from $USER, config = specify below
+  ldap_override: ""      # only used if ldap_source = "config"
+
+# Command categories define the structure and content of the interactive interface
+command_categories:
+  - name: "Create & Manage Applications"
+    commands:
+      - cmd: "create"
+        description: "Create new App from Scratch"
+        owner_crew: "CREW-1234"
+        status: "available"
+
+      - cmd: "templates"
+        description: "Discover Supported App Types, and this is an example of a long use-to description that wraps within it's data-cell on the CLI. Notice the wrap also created a line break for better readability once it becomes a multi-line description both above and below the command entry."
+        owner_crew: "CREW-1234"
+        status: "available"
+
+      - cmd: "promote"
+        description: "Get DEV apps Production Ready"
+        owner_crew: "CREW-1234"
+        status: "coming_soon"
+
+      - cmd: "deploy"
+        description: "Deploy apps to Production"
+        owner_crew: "CREW-1234"
+        status: "coming_soon"
+
+  - name: "Specific to you (@LDAP-username)"
+    commands:
+      - cmd: "my apps"
+        description: "All the apps you own"
+        owner_crew: "CREW-1234"
+        status: "coming_soon"
+
+      - cmd: "my oncall"
+        description: "Your current on-call status"
+        owner_crew: "CREW-1234"
+        status: "coming_soon"
+
+      - cmd: "my todos"
+        description: "All items requiring you attention"
+        owner_crew: "CREW-1234"
+        status: "coming_soon"
+
+  - name: "Ownership, Delegation & Access"
+    commands:
+      - cmd: "crews"
+        description: "Find & Get Info on a Crew"
+        owner_crew: "CREW-2345"
+        status: "coming_soon"
+
+      - cmd: "transfer"
+        description: "Transfer Asset(s) to a Crew"
+        owner_crew: "CREW-2345"
+        status: "coming_soon"
+
+      - cmd: "grant"
+        description: "Grant Access to an Asset"
+        owner_crew: "CREW-2345"
+        status: "coming_soon"
+
+      - cmd: "revoke"
+        description: "Revoke Access from an Asset"
+        owner_crew: "CREW-2345"
+        status: "coming_soon"
+
+  - name: "Products, Assets & Resource Catalog"
+    commands:
+      - cmd: "catalog"
+        description: "Access & Manage the Asset Catalog"
+        owner_crew: "CREW-2345"
+        status: "coming_soon"
+
+      - cmd: "approval"
+        description: "Access & Manage Exception Approvals"
+        owner_crew: "CREW-2345"
+        status: "coming_soon"
+
+  - name: "EngX CLI Developer Tools"
+    visibility: "dev_tools"  # Only show with --show-dev-tools flag
+    commands:
+      - cmd: "analytics"
+        description: "CLI interaction analytics and usage patterns"
+        owner_crew: "CREW-1234"
+        status: "available"
+
+      - cmd: "dev"
+        description: "Plugin development tools and hot-reload management"
+        owner_crew: "CREW-1234"
+        status: "available"
+
+# Commands to exclude from the interactive interface
+# These will not appear in the root command interface but remain available via direct invocation
+excluded_commands:
+  - "test-error"      # Development/testing command
+  - "validate"        # Development command for plugin validation
+  - "plugins"         # Development command for plugin discovery
+  - "help"            # Handled separately via --help flag
+  - "completion"      # Shell completion command
+
+# Interface configuration
+interface:
+  header_text: "---- EngX CLI v.##.##.#### ------------------------------ OCT 2025 Release ----"
+  minimum_width: 40
+  default_width: 80
+  number_column_width: 4
+  command_column_width: 20
+  crew_column_width: 12
+  expandable_column: "description"  # Column that expands to fill available space
+
+# Status indicators and their display
+status_indicators:
+  available:
+    symbol: "✓"
+    style: "success"
+  coming_soon:
+    symbol: "⏳"
+    style: "muted"
+  experimental:
+    symbol: "🧪"
+    style: "warning"
+  deprecated:
+    symbol: "⚠️"
+    style: "error"

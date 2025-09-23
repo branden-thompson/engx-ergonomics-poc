@@ -32,8 +32,8 @@ func main() {
 
 	rootCmd := &cobra.Command{
 		Use:   "engx",
-		Short: "ENGX - React Application Development Tool (POC)",
-		Long: `ENGX POC - A terminal-based simulation of React web application creation.
+		Short: "ENGX - Engineering Productivity CLI (POC)",
+		Long: `ENGX POC - A terminal-based simulation of engineering productivity tools and workflows.
 This tool demonstrates human-computer interaction patterns for developer tooling.
 
 Focus: Terminal UI/UX patterns, not actual application scaffolding.`,
@@ -48,6 +48,7 @@ Focus: Terminal UI/UX patterns, not actual application scaffolding.`,
 
 	// Other global flags
 	rootCmd.PersistentFlags().String("config", "", "Config file (default searches for .engx/config.yaml)")
+	rootCmd.PersistentFlags().Bool("show-dev-tools", false, "Show developer tools section in interactive interface")
 
 	// Mark verbosity flags as mutually exclusive
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "concise", "verbose", "debug")
@@ -516,6 +517,10 @@ Focus: Terminal UI/UX patterns, not actual application scaffolding.`,
 	rootCmd.AddCommand(devCmd)
 	rootCmd.AddCommand(templatesCmd)
 	rootCmd.AddCommand(analyticsCmd)
+
+	// Initialize root command router for interactive interface
+	rootRouter := NewRootCommandRouter(rootCmd, registry, deps)
+	rootRouter.ModifyRootCommand()
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
