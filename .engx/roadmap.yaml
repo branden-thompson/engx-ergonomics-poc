@@ -52,6 +52,11 @@ command_categories:
         owner_crew: "CREW-1234"
         status: "coming_soon"
 
+      - cmd: "my rdevs"
+        description: "List and Manage your rDEV instances"
+        owner_crew: "CREW-1234"
+        status: "coming_soon"
+
   - name: "Ownership, Delegation & Access"
     commands:
       - cmd: "crews"

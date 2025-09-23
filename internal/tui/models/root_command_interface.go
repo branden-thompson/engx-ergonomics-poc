@@ -341,8 +341,16 @@ func (s *InteractiveCommandSelector) formatCategoryHeader(categoryName string) s
 		// Split on @ to separate the text and username
 		parts := strings.Split(categoryName, "@")
 		if len(parts) == 2 {
-			// Format: "Specific to you (" + colorWhite + "@" + colorBrightBlue + "username" + colorWhite + ")"
-			return colorWhite + parts[0] + "@" + colorBrightBlue + parts[1] + colorWhite
+			// Extract username (remove closing parenthesis if present)
+			username := parts[1]
+			if strings.HasSuffix(username, ")") {
+				username = strings.TrimSuffix(username, ")")
+				// Format: "Specific to you (" + colorGreen + "@username" + colorWhite + ")"
+				return colorWhite + parts[0] + colorGreen + "@" + username + colorWhite + ")"
+			} else {
+				// Format: "Specific to you (" + colorGreen + "@username" + colorWhite
+				return colorWhite + parts[0] + colorGreen + "@" + username + colorWhite
+			}
 		}
 	}
 
@@ -364,11 +372,11 @@ func (s *InteractiveCommandSelector) renderAnimatedHeader() {
 	// Build the header line manually to include animated text
 	leftPadding := colorDarkGray + "----" + colorReset + " "
 	rightText := " " + colorWhite + "OCT 2025 Release" + colorReset + " " + colorDarkGray + "----" + colorReset
-	version := colorWhite + " v0.8.0" + colorReset
+	version := colorWhite + " v0.8.0 " + colorReset
 
 	// Calculate padding
 	totalWidth := s.terminalWidth
-	usedWidth := 4 + 1 + len("EngX CLI") + len(" v0.8.0") + 1 + len("OCT 2025 Release") + 1 + 4 // rough calculation
+	usedWidth := 4 + 1 + len("EngX CLI") + len(" v0.8.0 ") + 1 + len("OCT 2025 Release") + 1 + 4 // rough calculation
 	middlePadding := totalWidth - usedWidth
 	if middlePadding < 0 {
 		middlePadding = 0
