@@ -20,6 +20,51 @@ const (
 	ColorEngxPink      = "198" // \033[38;5;198m - #F06 equivalent for 'engx'
 	ColorFlagGreen     = "48"  // \033[38;5;48m - #0FD equivalent for flags
 
+	// Semantic colors for data tables and status indicators
+	ColorPrimaryOnCall   = "196" // \033[38;5;196m - deep red for primary on-call (#D62 approximation)
+	ColorSecondaryOnCall = "202" // \033[38;5;202m - orange-red for secondary on-call (#DA2 approximation)
+	ColorTableHeader     = "95"  // \033[95m - bright magenta/light purple for table headers
+	ColorRowNumber       = "90"  // \033[90m - dark grey for row numbers (same as ColorDarkGray)
+	ColorAttribute       = "90"  // \033[90m - dark grey for attributes (same as ColorDarkGray)
+	ColorDescription     = "90"  // \033[90m - dark grey for description text (same as ColorDarkGray)
+	ColorLabel           = "97"  // \033[97m - bright white for labels/names (same as ColorBrightWhite)
+
+	// Username colors
+	ColorCurrentUser     = "92"  // \033[92m - bright green for current user's username
+	ColorOtherUser       = "96"  // \033[96m - bright cyan/light blue for other usernames
+
+	// Role colors (approximating hex colors with ANSI equivalents)
+	ColorRoleOwner       = "95"  // \033[95m - bright magenta for Owner (#A4C approximation)
+	ColorRoleAdmin       = "93"  // \033[93m - bright yellow for Admin (#FA0 approximation)
+	ColorRoleMember      = "92"  // \033[92m - bright green for Member (#3AD approximation)
+	ColorRoleAuto        = "94"  // \033[94m - bright blue for Auto (#69A approximation)
+	ColorRoleTemp        = "91"  // \033[91m - bright red for Temp (#C66 approximation)
+
+	// IC Level colors (Individual Contributor levels - 256-color approximations)
+	ColorIC1             = "247" // \033[38;5;247m - light grey for IC1 (#999 approximation)
+	ColorIC2             = "159" // \033[38;5;159m - light blue for IC2 (#9CF approximation)
+	ColorIC3             = "75"  // \033[38;5;75m - bright blue for IC3 (#59D approximation)
+	ColorIC4             = "33"  // \033[38;5;33m - blue for IC4 (#38E approximation)
+	ColorIC5             = "87"  // \033[38;5;87m - cyan for IC5 (#3BE approximation)
+	ColorIC6             = "39"  // \033[38;5;39m - bright cyan for IC6 (#0BF approximation)
+	ColorIC7             = "80"  // \033[38;5;80m - cyan-green for IC7 (#5DD approximation)
+	ColorIC8             = "43"  // \033[38;5;43m - green-cyan for IC8 (#2DC approximation)
+	ColorIC9             = "51"  // \033[38;5;51m - bright cyan for IC9 (#0FD approximation)
+
+	// MR Level colors (Management levels - 256-color approximations)
+	ColorMR2             = "143" // \033[38;5;143m - brown/tan for MR2 (#8B7 approximation)
+	ColorMR3             = "107" // \033[38;5;107m - olive for MR3 (#6B3 approximation)
+	ColorMR4             = "136" // \033[38;5;136m - dark yellow for MR4 (#5C1 approximation)
+	ColorMR5             = "71"  // \033[38;5;71m - green for MR5 (#3D3 approximation)
+	ColorMR6             = "73"  // \033[38;5;73m - teal for MR6 (#3D8 approximation)
+	ColorMR7             = "30"  // \033[38;5;30m - dark cyan for MR7 (#1E8 approximation)
+	ColorMR8             = "36"  // \033[38;5;36m - cyan for MR8 (#0F8 approximation)
+	ColorMR9             = "51"  // \033[38;5;51m - bright cyan for MR9 (#0FD approximation)
+
+	// Crew type colors
+	ColorStandardCrew    = "94"  // \033[94m - bright blue for STANDARD CREW (#08F approximation)
+	ColorVirtualCrew     = "177" // \033[38;5;177m - light purple for VIRTUAL CREW (#D0F approximation)
+
 	// Reset
 	ColorReset = "0" // \033[0m - reset to default
 )

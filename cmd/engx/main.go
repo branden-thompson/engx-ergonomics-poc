@@ -7,6 +7,7 @@ import (
 
 	"github.com/bthompso/engx-ergonomics-poc/pkg/common"
 	"github.com/bthompso/engx-ergonomics-poc/plugins/create"
+	"github.com/bthompso/engx-ergonomics-poc/plugins/crews"
 	testerror "github.com/bthompso/engx-ergonomics-poc/plugins/test-error"
 	"github.com/spf13/cobra"
 )
@@ -534,6 +535,12 @@ func registerPlugins(registry *common.PluginRegistry, deps *common.Dependencies)
 	createPlugin := create.NewPlugin(deps)
 	if err := registry.Register(createPlugin); err != nil {
 		return fmt.Errorf("failed to register create plugin: %w", err)
+	}
+
+	// Register crews plugin
+	crewsPlugin := crews.NewPlugin(deps)
+	if err := registry.Register(crewsPlugin); err != nil {
+		return fmt.Errorf("failed to register crews plugin: %w", err)
 	}
 
 	// Register test-error plugin
