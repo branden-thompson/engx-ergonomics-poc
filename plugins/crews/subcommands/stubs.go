@@ -178,34 +178,22 @@ func HandleOnCall(dataStore *data.SimulationDataStore, crewID string) error {
 		return nil
 	}
 
+	currentRotations := crew.GetCurrentOnCallRotations()
 	fmt.Printf("Current On-Call: ")
-	if len(crew.OnCallSchedule.CurrentOnCall) == 0 {
+	if len(currentRotations) == 0 {
 		fmt.Printf("None\n")
 	} else {
-		for i, userID := range crew.OnCallSchedule.CurrentOnCall {
+		for i, rotation := range currentRotations {
 			if i > 0 {
 				fmt.Printf(", ")
 			}
 			// Find member details
 			for _, member := range crew.Members {
-				if member.UserID == userID {
-					fmt.Printf("%s (%s)", member.FullName, userID)
+				if member.UserID == rotation.OnCallMember {
+					fmt.Printf("%s (%s - %s)", member.FullName, rotation.OnCallMember, rotation.Name)
 					break
 				}
 			}
-		}
-		fmt.Printf("\n")
-	}
-
-	fmt.Printf("Rotation Type: %s\n", crew.OnCallSchedule.RotationType)
-
-	if len(crew.OnCallSchedule.EscalationPath) > 0 {
-		fmt.Printf("Escalation Path: ")
-		for i, userID := range crew.OnCallSchedule.EscalationPath {
-			if i > 0 {
-				fmt.Printf(" → ")
-			}
-			fmt.Printf("%s", userID)
 		}
 		fmt.Printf("\n")
 	}

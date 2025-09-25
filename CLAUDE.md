@@ -513,5 +513,103 @@ This POC successfully demonstrates:
 
 ---
 **BRTOPS Version**: 1.1.001
-**Project Status**: PHASE 7 COMPLETE - Professional Data Tables & Color Systems with Comprehensive Shared Component Library
+**Project Status**: PHASE 7+ COMPLETE - Enhanced Table Layout System with Intelligent Truncation & Responsive Design
 **Next Phase**: Expand simulation scope with additional engineering productivity command categories leveraging established TUI component architecture
+
+#### Enhanced Table Layout System with Intelligent Truncation (Smart Search Implementation)
+- **Configurable Gutter System**: Professional 4-character spacing between data columns only
+- **Intelligent Truncation Algorithm**: Smart content management that automatically adapts to terminal width constraints
+- **Correct Gutter Pattern**: `[prefix][number][name][gutter][attr1][gutter][attr2]...` - NO gutter between icon and ##, NO end gutter
+- **Truncation Properties**: `Truncatable`, `TruncatedMinWidth`, `TruncationTail` for granular control over content shortening
+- **Data-Driven Column Sizing**: Fixed columns sized to maximum actual data width, not arbitrary values
+- **Header Optimization**: Concise labels for narrow width compatibility ("CREWS" vs "MEMBERSHIPS")
+
+#### 🔧 Technical Implementation Details
+
+**Enhanced Column Definition Properties:**
+```go
+type ColumnDefinition struct {
+    // ... existing fields
+    Truncatable       bool   // Whether this column can be truncated in narrow widths
+    TruncatedMinWidth int    // Minimum width this column can be truncated to
+    TruncationTail    string // Truncation indicator (default: "...")
+    Fill              bool   // Whether this column should fill remaining space
+}
+```
+
+**Intelligent Truncation Algorithm:**
+1. **Calculate Total Width**: Sum all fixed column widths + gutter space + badge space
+2. **Identify Truncatable Columns**: Find columns with `Truncatable: true`
+3. **Distribute Excess Reduction**: If table exceeds terminal width, reduce truncatable columns proportionally
+4. **Respect Minimums**: Never reduce below `TruncatedMinWidth` for any column
+5. **Apply Configurable Tail**: Use column-specific or default "..." truncation indicator
+
+**Gutter Pattern Implementation:**
+```go
+// CRITICAL: Manual gutter placement following exact pattern
+for i, part := range rowParts {
+    rowLine.WriteString(part)
+
+    // Add gutter after column 2 (index 2) and onwards, but not after the last column
+    if i >= 2 && i < len(rowParts)-1 {
+        rowLine.WriteString(gutter) // 4-character professional spacing
+    }
+}
+```
+
+**Formula for Gutter Count**: `gutterWidth * (columnCount - 3)`
+- **Rationale**: No gutter before prefix, no gutter between prefix/number, no gutter at end
+- **Example**: 6 columns = 3 gutters (between columns 3-4, 4-5, 5-6)
+
+#### 🎯 Narrow Width Optimization Learnings
+
+**Critical Optimizations for 60-Column Terminal Compatibility:**
+
+1. **Header Text Optimization**:
+   - `"MEMBERSHIPS"` (11 chars) → `"CREWS"` (5 chars) = 54% space savings
+   - Always use shortest meaningful labels for narrow width compatibility
+
+2. **Column Width Right-Sizing**:
+   - `LDAP` column: 18 chars → 14 chars (based on `@webinfra.lead` actual max width)
+   - Always size fixed columns to actual data width, not estimated maximums
+
+3. **Fill Column Truncation Strategy**:
+   - Set `TruncatedMinWidth: 12` for readability while allowing aggressive compression
+   - Use semantic truncation that preserves key identifying information
+   - `"Web Infrastructure Team"` → `"Web Infrast..."` maintains recognizable content
+
+**Testing Protocol for Narrow Widths:**
+```bash
+# Essential width testing coverage
+COLUMNS=60 ./engx crews web   # Narrow width with truncation
+COLUMNS=80 ./engx crews web   # Standard width
+COLUMNS=100 ./engx crews web  # Wide width (original problem size)
+```
+
+#### 🚫 Anti-Patterns for Narrow Width Support
+
+**NEVER:**
+1. **Use arbitrary column widths** - Always size to actual data requirements
+2. **Apply gutters between all columns** - Follow exact `[prefix][number][data][gutter][attr]...` pattern
+3. **Use long header text** - Optimize for shortest meaningful labels
+4. **Ignore truncation needs** - Implement intelligent truncation for responsive design
+5. **Size for theoretical maximums** - Use actual data width analysis for fixed columns
+
+#### ✅ PROVEN PATTERN: SmartSearch Table Implementation
+
+**Working Table Structure (All three table types):**
+```go
+layout := components.NewEnhancedTableLayout(4, []components.ColumnDefinition{
+    {Name: "prefix", Header: "", Width: 3, Alignment: "left"},
+    {Name: "number", Header: "##", Width: 3, Alignment: "left"},
+    {Name: "name", Header: "ENTITY NAME", Fill: true, MinWidth: 20,
+     Truncatable: true, TruncatedMinWidth: 12, TruncationTail: "..."},
+    // Fixed columns sized to actual data requirements
+    {Name: "attr1", Header: "ATTR1", Width: X, Alignment: "left"},
+    {Name: "attr2", Header: "ATTR2", Width: Y, Alignment: "right"},
+})
+```
+
+**Result**: Professional tables that adapt seamlessly from 60 to 100+ column widths with intelligent content management and consistent 4-character professional spacing.
+
+This implementation provides the foundation for responsive table design across all terminal widths commonly used by developers.

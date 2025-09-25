@@ -9,6 +9,7 @@ type Crew struct {
 	ID              string              `json:"id"`              // CREW-1234
 	VanityName      string              `json:"vanity_name"`     // "Web Platform Team"
 	Description     string              `json:"description"`     // Team purpose
+	Type            CrewType            `json:"type"`            // STANDARD, VIRTUAL, etc.
 	CreatedAt       time.Time           `json:"created_at"`
 	CreatedBy       string              `json:"created_by"`      // Creator LDAP
 	Members         []Member            `json:"members"`
@@ -70,13 +71,18 @@ const (
 
 // OnCallSchedule manages on-call rotation for a crew
 type OnCallSchedule struct {
-	CurrentOnCall   []string            `json:"current_oncall"`  // Current rotation
-	Schedule        []OnCallPeriod      `json:"schedule"`        // Upcoming rotations
-	RotationType    string              `json:"rotation_type"`   // weekly, daily, etc.
-	EscalationPath  []string            `json:"escalation"`      // Backup contacts
+	Rotations       []OnCallRotation    `json:"rotations"`       // Array of active rotations
 	Enabled         bool                `json:"enabled"`         // Whether on-call is active
 	LastUpdated     time.Time           `json:"last_updated"`
 	UpdatedBy       string              `json:"updated_by"`
+}
+
+// OnCallRotation represents a time-based on-call assignment for a crew member
+type OnCallRotation struct {
+	Name            string              `json:"name"`            // "Primary", "Secondary", "Manager"
+	OnCallMember    string              `json:"oncall_member"`   // LDAP username
+	RotationStarts  time.Time           `json:"rotation_starts"` // Start date/time
+	RotationEnds    time.Time           `json:"rotation_ends"`   // End date/time
 }
 
 // OnCallPeriod represents a specific on-call assignment
@@ -92,9 +98,9 @@ type OnCallPeriod struct {
 type OnCallType string
 
 const (
-	OnCallPrimary OnCallType = "primary"
-	OnCallBackup  OnCallType = "backup"
-	OnCallTemp    OnCallType = "temp"
+	OnCallPrimary   OnCallType = "primary"
+	OnCallSecondary OnCallType = "secondary"
+	OnCallTemp      OnCallType = "temp"
 )
 
 // AccessGrant represents external access delegation
@@ -239,3 +245,51 @@ func (c *Crew) GetMember(userID string) *Member {
 func (c *Crew) IsActive() bool {
 	return c.Status == CrewStatusActive
 }
+
+// GetCurrentOnCallRotations returns currently active on-call rotations
+func (c *Crew) GetCurrentOnCallRotations() []OnCallRotation {
+	if !c.OnCallSchedule.Enabled {
+		return []OnCallRotation{}
+	}
+
+	now := time.Now()
+	var currentRotations []OnCallRotation
+
+	for _, rotation := range c.OnCallSchedule.Rotations {
+		if now.After(rotation.RotationStarts) && now.Before(rotation.RotationEnds) {
+			currentRotations = append(currentRotations, rotation)
+		}
+	}
+
+	return currentRotations
+}
+
+// IsOnCallNow checks if a specific user is currently on-call
+func (c *Crew) IsOnCallNow(userID string) bool {
+	currentRotations := c.GetCurrentOnCallRotations()
+	for _, rotation := range currentRotations {
+		if rotation.OnCallMember == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// GetOnCallRole returns the current on-call role name for a user (e.g., "Primary", "Secondary")
+func (c *Crew) GetOnCallRole(userID string) string {
+	currentRotations := c.GetCurrentOnCallRotations()
+	for _, rotation := range currentRotations {
+		if rotation.OnCallMember == userID {
+			return rotation.Name
+		}
+	}
+	return ""
+}
+
+// CrewType defines different types of crews
+type CrewType string
+
+const (
+	CrewTypeStandard CrewType = "STANDARD"
+	CrewTypeVirtual  CrewType = "VIRTUAL"
+)

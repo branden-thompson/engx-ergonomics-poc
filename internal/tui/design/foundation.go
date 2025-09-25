@@ -38,6 +38,10 @@ const (
 	ColorRoleAdmin       = "93"  // \033[93m - bright yellow for Admin (#FA0 approximation)
 	ColorRoleMember      = "92"  // \033[92m - bright green for Member (#3AD approximation)
 	ColorRoleAuto        = "94"  // \033[94m - bright blue for Auto (#69A approximation)
+
+	// Crew type colors
+	ColorCrewStandard    = "39"  // \033[39m - light blue for STANDARD crews
+	ColorCrewVirtual     = "201" // \033[38;5;201m - magenta for VIRTUAL crews
 	ColorRoleTemp        = "91"  // \033[91m - bright red for Temp (#C66 approximation)
 
 	// IC Level colors (Individual Contributor levels - 256-color approximations)

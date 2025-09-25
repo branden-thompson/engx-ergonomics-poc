@@ -7,27 +7,33 @@ import (
 
 // ColumnDefinition defines how a column should be rendered in a data table row
 type ColumnDefinition struct {
-	Name         string // Column name/identifier
-	Header       string // Column header text
-	ShowName     bool   // Whether to show the column name
-	Width        int    // Fixed width (0 = fill column)
-	MinWidth     int    // Minimum width for fill columns
-	MaxWidth     int    // Maximum width for fill columns (0 = no limit)
-	SupportsWrap bool   // Whether content can wrap within the column width
-	Alignment    string // "left", "right", "center"
-	Color        string // ANSI color code
+	Name              string // Column name/identifier
+	Header            string // Column header text
+	ShowName          bool   // Whether to show the column name
+	Width             int    // Fixed width (0 = fill column)
+	MinWidth          int    // Minimum width for fill columns
+	MaxWidth          int    // Maximum width for fill columns (0 = no limit)
+	SupportsWrap      bool   // Whether content can wrap within the column width
+	Alignment         string // "left", "right", "center"
+	Color             string // ANSI color code
+	Fill              bool   // Whether this column should fill remaining space (alternative to Width=0)
+	Truncatable       bool   // Whether this column can be truncated in narrow widths
+	TruncatedMinWidth int    // Minimum width this column can be truncated to
+	TruncationTail    string // Truncation indicator (default: "...")
 }
 
 // DataTableLayout defines the complete table structure with data
 type DataTableLayout struct {
-	Columns []ColumnDefinition
-	Data    [][]string // Each row is a slice of strings matching column order
+	Columns     []ColumnDefinition
+	Data        [][]string // Each row is a slice of strings matching column order
+	GutterWidth int        // Space between columns (default: 1, recommended: 4)
 }
 
 // DataTableRow handles rendering of table rows with automatic width calculation
 type DataTableRow struct {
 	terminalWidth int
 	columns       []ColumnDefinition
+	gutterWidth   int    // Space between columns (configurable)
 	prefix        string // Icon/indicator prefix (e.g., " ⏺ ")
 	badge         string // Right-aligned badge (e.g., "(On-Call)")
 	badgeGutter   int    // Minimum spaces before badge
@@ -42,6 +48,7 @@ func NewDataTableRow(terminalWidth int, columns []ColumnDefinition) *DataTableRo
 	return &DataTableRow{
 		terminalWidth: terminalWidth,
 		columns:       columns,
+		gutterWidth:   1, // Default 1-space gutter (backward compatible)
 		badgeGutter:   4, // Default 4-space gutter
 		renderBadge:   true, // Default to rendering badges
 	}
@@ -52,9 +59,17 @@ func NewDataTableRowFromLayout(terminalWidth int, layout *DataTableLayout) *Data
 	if terminalWidth < 20 {
 		terminalWidth = 20
 	}
+
+	// Use layout's gutter width if specified, otherwise default to 1
+	gutterWidth := 1
+	if layout.GutterWidth > 0 {
+		gutterWidth = layout.GutterWidth
+	}
+
 	return &DataTableRow{
 		terminalWidth: terminalWidth,
 		columns:       layout.Columns,
+		gutterWidth:   gutterWidth,
 		badgeGutter:   4, // Default 4-space gutter
 		renderBadge:   true, // Default to rendering badges
 	}
@@ -101,8 +116,21 @@ func (d *DataTableRow) RenderHeader() string {
 		headerParts = append(headerParts, formatted)
 	}
 
-	headerLine := d.prefix + strings.Join(headerParts, " ")
-	return headerLine
+	// Join with configurable gutter width following pattern: [prefix][number][name][gutter][attr1][gutter]...
+	var headerLine strings.Builder
+	headerLine.WriteString(d.prefix)
+	gutter := strings.Repeat(" ", d.gutterWidth)
+
+	for i, part := range headerParts {
+		headerLine.WriteString(part)
+
+		// Add gutter after column 2 (index 2) and onwards, but not after the last column
+		if i >= 2 && i < len(headerParts)-1 {
+			headerLine.WriteString(gutter)
+		}
+	}
+
+	return headerLine.String()
 }
 
 // RenderRow renders a data row using the column definitions (legacy method for backward compatibility)
@@ -143,10 +171,14 @@ func (d *DataTableRow) FormatDataRow(rowData []string) string {
 			value = rowData[i]
 		}
 
-		// Handle wrapping if supported
-		if col.SupportsWrap && d.getDisplayWidth(value) > width {
-			// For now, truncate - wrapping would require multi-line logic
-			value = d.truncateText(value, width)
+		// Handle truncation if content is too wide AND column is truncatable
+		if d.getDisplayWidth(value) > width && col.Truncatable {
+			// Use configurable truncation tail from column definition
+			truncationTail := col.TruncationTail
+			if truncationTail == "" {
+				truncationTail = "..." // Default
+			}
+			value = d.truncateText(value, width, truncationTail)
 		}
 
 		// Apply alignment and padding FIRST (without colors)
@@ -160,14 +192,27 @@ func (d *DataTableRow) FormatDataRow(rowData []string) string {
 		rowParts = append(rowParts, formatted)
 	}
 
-	rowLine := strings.Join(rowParts, " ")
+	// Join with configurable gutter width following pattern: [prefix][number][name][gutter][attr1][gutter]...
+	var rowLine strings.Builder
+	gutter := strings.Repeat(" ", d.gutterWidth)
+
+	for i, part := range rowParts {
+		rowLine.WriteString(part)
+
+		// Add gutter after column 2 (index 2) and onwards, but not after the last column
+		if i >= 2 && i < len(rowParts)-1 {
+			rowLine.WriteString(gutter)
+		}
+	}
+
+	finalRowLine := rowLine.String()
 
 	// Add badge if specified AND rendering is enabled
 	if d.badge != "" && d.renderBadge {
-		rowLine = d.alignBadge(rowLine, d.badge)
+		finalRowLine = d.alignBadge(finalRowLine, d.badge)
 	}
 
-	return rowLine
+	return finalRowLine
 }
 
 // calculateColumnWidths determines the width of each column based on terminal width
@@ -180,10 +225,15 @@ func (d *DataTableRow) calculateColumnWidths(data map[string]string) []int {
 	prefixWidth := d.getDisplayWidth(d.prefix)
 	usedWidth += prefixWidth
 
-	// Calculate spaces between columns (N-1 spaces for N columns)
-	if len(d.columns) > 1 {
-		usedWidth += len(d.columns) - 1
+	// Calculate gutter spaces between columns using configurable gutter width
+	// Following your design: no gutter at beginning, between ICON/##, or end
+	// So for N columns, we have (N-3) gutters assuming first 2 are prefix columns
+	gutterCount := len(d.columns) - 3
+	if gutterCount < 0 {
+		gutterCount = 0
 	}
+	gutterSpace := d.gutterWidth * gutterCount
+	usedWidth += gutterSpace
 
 	// Calculate badge space if present
 	badgeSpace := 0
@@ -194,14 +244,14 @@ func (d *DataTableRow) calculateColumnWidths(data map[string]string) []int {
 
 	// First pass: calculate fixed column widths and identify fill columns
 	for i, col := range d.columns {
-		if col.Width > 0 {
-			// Fixed width column
-			widths = append(widths, col.Width)
-			usedWidth += col.Width
-		} else {
+		if col.Fill || col.Width == 0 {
 			// Fill column - will be calculated later
 			widths = append(widths, 0)
 			fillColumns = append(fillColumns, i)
+		} else {
+			// Fixed width column
+			widths = append(widths, col.Width)
+			usedWidth += col.Width
 		}
 	}
 
@@ -249,10 +299,15 @@ func (d *DataTableRow) calculateColumnWidthsFromData(rowData []string) []int {
 	var fillColumns []int
 	usedWidth := 0
 
-	// Calculate spaces between columns (N-1 spaces for N columns)
-	if len(d.columns) > 1 {
-		usedWidth += len(d.columns) - 1
+	// Calculate gutter spaces between columns using configurable gutter width
+	// Following your design: no gutter at beginning, between ICON/##, or end
+	// So for N columns, we have (N-3) gutters assuming first 2 are prefix columns
+	gutterCount := len(d.columns) - 3
+	if gutterCount < 0 {
+		gutterCount = 0
 	}
+	gutterSpace := d.gutterWidth * gutterCount
+	usedWidth += gutterSpace
 
 	// Calculate badge space if present
 	if d.badge != "" {
@@ -262,14 +317,14 @@ func (d *DataTableRow) calculateColumnWidthsFromData(rowData []string) []int {
 
 	// First pass: calculate fixed column widths and identify fill columns
 	for i, col := range d.columns {
-		if col.Width > 0 {
-			// Fixed width column
-			widths = append(widths, col.Width)
-			usedWidth += col.Width
-		} else {
+		if col.Fill || col.Width == 0 {
 			// Fill column - will be calculated later
 			widths = append(widths, 0)
 			fillColumns = append(fillColumns, i)
+		} else {
+			// Fixed width column
+			widths = append(widths, col.Width)
+			usedWidth += col.Width
 		}
 	}
 
@@ -308,22 +363,126 @@ func (d *DataTableRow) calculateColumnWidthsFromData(rowData []string) []int {
 		}
 	}
 
+	// Third pass: Apply intelligent truncation if table is still too wide
+	d.applyIntelligentTruncation(widths, rowData)
+
 	return widths
 }
 
-// truncateText truncates text to fit within the specified width
-func (d *DataTableRow) truncateText(text string, width int) string {
-	if width <= 3 {
+// applyIntelligentTruncation implements the intelligent truncation algorithm
+func (d *DataTableRow) applyIntelligentTruncation(widths []int, rowData []string) {
+	// Calculate total used width including gutters
+	totalUsedWidth := 0
+	for _, width := range widths {
+		totalUsedWidth += width
+	}
+
+	// Add gutter space calculation
+	gutterCount := len(d.columns) - 3
+	if gutterCount < 0 {
+		gutterCount = 0
+	}
+	totalUsedWidth += d.gutterWidth * gutterCount
+
+	// Add badge space if present
+	if d.badge != "" {
+		totalUsedWidth += len(d.badge) + d.badgeGutter
+	}
+
+	// Check if we need truncation
+	if totalUsedWidth <= d.terminalWidth {
+		return // No truncation needed
+	}
+
+	// Find truncatable columns
+	var truncatableColumns []int
+	for i, col := range d.columns {
+		if col.Truncatable {
+			truncatableColumns = append(truncatableColumns, i)
+		}
+	}
+
+	if len(truncatableColumns) == 0 {
+		return // No columns can be truncated
+	}
+
+	// Calculate excess width that needs to be trimmed
+	excessWidth := totalUsedWidth - d.terminalWidth
+
+	// Distribute truncation across truncatable columns
+	for excessWidth > 0 && len(truncatableColumns) > 0 {
+		truncationPerColumn := maxInt(1, excessWidth/len(truncatableColumns))
+		var remainingTruncatable []int
+
+		for _, colIndex := range truncatableColumns {
+			col := d.columns[colIndex]
+			currentWidth := widths[colIndex]
+
+			// Determine minimum width for this column
+			minWidth := col.TruncatedMinWidth
+			if minWidth == 0 {
+				minWidth = 5 // Default minimum to fit "..." + 2 chars
+			}
+
+			// Calculate how much we can truncate this column
+			canTruncate := currentWidth - minWidth
+			if canTruncate <= 0 {
+				continue // This column is already at minimum
+			}
+
+			// Truncate this column
+			toTruncate := minInt(truncationPerColumn, canTruncate)
+			widths[colIndex] -= toTruncate
+			excessWidth -= toTruncate
+
+			// Keep this column in the list if it can be truncated further
+			if widths[colIndex] > minWidth {
+				remainingTruncatable = append(remainingTruncatable, colIndex)
+			}
+		}
+
+		truncatableColumns = remainingTruncatable
+		if len(remainingTruncatable) == 0 {
+			break // No more columns can be truncated
+		}
+	}
+}
+
+// minInt returns the smaller of two integers
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// maxInt returns the larger of two integers
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// truncateText truncates text to fit within the specified width with configurable tail
+func (d *DataTableRow) truncateText(text string, width int, truncationTail string) string {
+	if truncationTail == "" {
+		truncationTail = "..." // Default truncation tail
+	}
+
+	tailWidth := len(truncationTail)
+	if width <= tailWidth {
 		return strings.Repeat(".", width)
 	}
 	if d.getDisplayWidth(text) <= width {
 		return text
 	}
-	// Truncate and add ellipsis
+
+	// Truncate and add configurable tail
 	for i := len(text) - 1; i > 0; i-- {
 		truncated := text[:i]
-		if d.getDisplayWidth(truncated)+3 <= width { // +3 for "..."
-			return truncated + "..."
+		if d.getDisplayWidth(truncated)+tailWidth <= width {
+			return truncated + truncationTail
 		}
 	}
 	return strings.Repeat(".", width)
@@ -387,4 +546,12 @@ func (d *DataTableRow) CalculateColumnWidthsFromData(rowData []string) []int {
 // FormatCell exposes the cell formatting method
 func (d *DataTableRow) FormatCell(value string, width int, alignment string, isHeader bool) string {
 	return d.formatCell(value, width, alignment, isHeader)
+}
+
+// NewEnhancedTableLayout creates a new table layout with configurable gutters
+func NewEnhancedTableLayout(gutterWidth int, columns []ColumnDefinition) *DataTableLayout {
+	return &DataTableLayout{
+		Columns:     columns,
+		GutterWidth: gutterWidth,
+	}
 }

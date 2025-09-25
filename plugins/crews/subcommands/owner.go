@@ -12,49 +12,49 @@ import (
 // NewOwnerCommand creates the owner subcommand
 func NewOwnerCommand(dataStore *data.SimulationDataStore) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "owner <AssetURN>",
-		Short: "Show the owning crew for an asset",
-		Long: `Show the crew that owns a specific asset including:
+		Use:   "owner <AssetIdentifier>",
+		Short: "Show comprehensive asset ownership and access information",
+		Long: `Show comprehensive asset ownership information including:
 
 • Asset information and metadata
-• Owning crew details and contact information
-• Current on-call members for the owning crew
-• Delegated access and permissions
-• Asset status and management information
+• Owning crew details and current on-call members
+• All crews with access and their permission levels
+• Asset dependencies and their health status
+• Complete ownership chain and contact information
 
-This command helps identify who is responsible for a particular
-asset and how to contact them for issues or requests.`,
+Supports multiple asset identifier formats:
+• Catalog ID: AC123456
+• Asset URN: asset://web-app/dashboard
+• Vanity Name: "EngX Web Application" or partial matches like "engx"
+
+This command provides complete asset ownership visibility for
+contact, access management, and dependency tracking.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return HandleOwner(dataStore, args[0])
 		},
-		Example: `  engx crews owner asset://web-app/dashboard
-  engx crews owner asset://service/api-gateway
-  engx crews owner asset://database/user-store`,
+		Example: `  engx crews owner AC123456
+  engx crews owner asset://web-app/dashboard
+  engx crews owner "EngX Web Application"
+  engx crews owner engx`,
 	}
 
 	return cmd
 }
 
-// HandleOwner processes the owner command
-func HandleOwner(dataStore *data.SimulationDataStore, assetURN string) error {
-	// Get asset information
-	asset, err := dataStore.GetAsset(assetURN)
+// HandleOwner processes the owner command with multiple input format support
+func HandleOwner(dataStore *data.SimulationDataStore, assetParam string) error {
+	// Resolve asset using multiple input formats
+	asset, err := dataStore.ResolveCatalogAssetParameter(assetParam)
 	if err != nil {
-		return fmt.Errorf("failed to get asset information: %w", err)
+		return fmt.Errorf("failed to find asset '%s': %w", assetParam, err)
 	}
 
-	// Get owning crew
-	crew, err := dataStore.GetCrewByAsset(assetURN)
+	// Create renderer and display comprehensive ownership view
+	renderer := renderers.NewAssetOwnershipRenderer(dataStore)
+	output, err := renderer.Render(asset, getTerminalWidth())
 	if err != nil {
-		return fmt.Errorf("failed to get owning crew: %w", err)
-	}
-
-	// Create renderer and display
-	renderer := renderers.NewAssetOwnerRenderer()
-	output, err := renderer.Render(asset, crew, getTerminalWidth())
-	if err != nil {
-		return fmt.Errorf("failed to render asset owner information: %w", err)
+		return fmt.Errorf("failed to render asset ownership information: %w", err)
 	}
 
 	fmt.Print(output)

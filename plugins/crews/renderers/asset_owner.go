@@ -163,10 +163,15 @@ func (r *AssetOwnerRenderer) renderContactInfo(output *strings.Builder, crew *mo
 
 	// On-call information
 	if crew.OnCallSchedule.Enabled {
-		if len(crew.OnCallSchedule.CurrentOnCall) > 0 {
+		currentRotations := crew.GetCurrentOnCallRotations()
+		if len(currentRotations) > 0 {
+			var onCallMembers []string
+			for _, rotation := range currentRotations {
+				onCallMembers = append(onCallMembers, fmt.Sprintf("%s (%s)", rotation.OnCallMember, rotation.Name))
+			}
 			onCallLine := fmt.Sprintf("Current On-Call: %s%s%s",
 				r.colorScheme.OnCallActiveColor,
-				strings.Join(crew.OnCallSchedule.CurrentOnCall, ", "),
+				strings.Join(onCallMembers, ", "),
 				r.colorScheme.ResetColor)
 
 			output.WriteString(fmt.Sprintf("│ %s%s │\n",
@@ -177,20 +182,6 @@ func (r *AssetOwnerRenderer) renderContactInfo(output *strings.Builder, crew *mo
 			output.WriteString(fmt.Sprintf("│ %s%s │\n",
 				noOnCallLine,
 				strings.Repeat(" ", width-len(noOnCallLine)-4)))
-		}
-
-		// Escalation path
-		if len(crew.OnCallSchedule.EscalationPath) > 0 {
-			escalationLine := fmt.Sprintf("Escalation: %s",
-				strings.Join(crew.OnCallSchedule.EscalationPath, " → "))
-
-			if len(escalationLine) > width-4 {
-				escalationLine = escalationLine[:width-7] + "..."
-			}
-
-			output.WriteString(fmt.Sprintf("│ %s%s │\n",
-				escalationLine,
-				strings.Repeat(" ", width-len(escalationLine)-4)))
 		}
 	} else {
 		noOnCallLine := "On-call rotation: Disabled"
